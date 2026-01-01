@@ -1,0 +1,8 @@
+[package]
+name = "blaster_x_g6_control"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.33.3"
+hidapi = "2.6.4"
