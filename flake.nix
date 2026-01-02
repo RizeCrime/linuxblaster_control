@@ -1,5 +1,5 @@
 {
-  description = "A Nix-flake-based Rust development environment";
+  description = "Sound Blaster X G6 Control for Linux - A native GUI application to control the Creative Sound Blaster X G6";
 
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1"; # unstable Nixpkgs
@@ -47,7 +47,30 @@
               rust-src
             ]
           );
+
+        blaster-x-g6-control = prev.callPackage ./nix/package.nix {
+          rustPlatform = prev.makeRustPlatform {
+            cargo = final.rustToolchain;
+            rustc = final.rustToolchain;
+          };
+        };
       };
+
+      packages = forEachSupportedSystem (
+        { pkgs }:
+        {
+          default = pkgs.blaster-x-g6-control;
+          blaster-x-g6-control = pkgs.blaster-x-g6-control;
+          
+          # Debian package output
+          deb = pkgs.callPackage ./nix/deb.nix {
+            rustPlatform = pkgs.makeRustPlatform {
+              cargo = pkgs.rustToolchain;
+              rustc = pkgs.rustToolchain;
+            };
+          };
+        }
+      );
 
       devShells = forEachSupportedSystem (
         { pkgs }:
@@ -87,5 +110,28 @@
           };
         }
       );
+
+      # NixOS module for easy installation
+      nixosModules.default = { config, lib, pkgs, ... }:
+        with lib;
+        let
+          cfg = config.hardware.soundblaster-g6;
+        in
+        {
+          options.hardware.soundblaster-g6 = {
+            enable = mkEnableOption "Sound Blaster X G6 support";
+          };
+
+          config = mkIf cfg.enable {
+            # Install the control application
+            environment.systemPackages = [ self.packages.${pkgs.system}.blaster-x-g6-control ];
+
+            # Add udev rules for device access
+            services.udev.extraRules = ''
+              # Creative Sound Blaster X G6
+              SUBSYSTEM=="hidraw", ATTRS{idVendor}=="041e", ATTRS{idProduct}=="3256", MODE="0666"
+            '';
+          };
+        };
     };
 }

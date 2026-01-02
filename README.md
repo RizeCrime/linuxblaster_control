@@ -49,7 +49,58 @@ You may need to unplug and replug the device after adding the rule.
 
 ## Installation
 
-### Building from Source
+### Option 1: Download Pre-built Package (Recommended)
+
+**Debian/Ubuntu (.deb package)**
+
+Download the latest `.deb` file from the [GitHub Releases](https://github.com/RizeCrime/linuxblaster_control/releases) page and install:
+
+```bash
+sudo dpkg -i blaster-x-g6-control_1.1.0_amd64.deb
+sudo apt-get install -f  # Install any missing dependencies
+```
+
+This will install the application, desktop file, icon, and udev rules automatically.
+
+### Option 2: Nix Package Manager
+
+**NixOS (with flakes)**
+
+Add to your NixOS configuration:
+
+```nix
+{
+  inputs.blaster-x-g6-control.url = "github:RizeCrime/linuxblaster_control";
+
+  outputs = { self, nixpkgs, blaster-x-g6-control, ... }: {
+    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+      modules = [
+        blaster-x-g6-control.nixosModules.default
+        {
+          hardware.soundblaster-g6.enable = true;
+        }
+      ];
+    };
+  };
+}
+```
+
+**Any Linux with Nix (with flakes)**
+
+```bash
+# Run without installing
+nix run github:RizeCrime/linuxblaster_control
+
+# Install to user profile
+nix profile install github:RizeCrime/linuxblaster_control
+
+# Build locally
+git clone https://github.com/RizeCrime/linuxblaster_control.git
+cd linuxblaster_control
+nix build
+```
+
+### Option 3: Building from Source
 
 Requires Rust 2024 edition (nightly) and system dependencies for hidapi and egui.
 
@@ -85,12 +136,12 @@ On Arch:
 sudo pacman -S hidapi wayland libxkbcommon mesa
 ```
 
-### Nix
+### Nix Development Shell
 
-A `flake.nix` is provided for Nix users:
+A `flake.nix` is provided for Nix users who want to develop:
 
 ```bash
-nix develop  # Enter development shell
+nix develop  # Enter development shell with all dependencies
 cargo build --release
 ```
 

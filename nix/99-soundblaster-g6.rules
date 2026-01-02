@@ -1,0 +1,4 @@
+# Creative Sound Blaster X G6
+# This rule allows non-root users to access the Sound Blaster X G6 HID control interface
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="041e", ATTRS{idProduct}=="3256", MODE="0666", TAG+="uaccess"
+

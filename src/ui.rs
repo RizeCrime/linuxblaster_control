@@ -1,10 +1,10 @@
-use blaster_x_g6_control::{BlasterXG6, EqBand, Equalizer, SoundFeature};
+use crate::{BlasterXG6, EqBand, Equalizer, Preset, SoundFeature};
 use eframe::egui;
 
 /// Renders a feature row with checkbox and horizontal slider.
 fn feature_ui(
     ui: &mut egui::Ui,
-    device: &Option<BlasterXG6>,
+    device: &mut Option<BlasterXG6>,
     state: &mut FeatureState,
     label: &str,
     feature: SoundFeature,
@@ -19,12 +19,12 @@ fn feature_ui(
     ui.horizontal(|ui| {
         // Checkbox (no label, just the box)
         if ui.checkbox(&mut state.enabled, "").changed()
-            && let Some(device) = device
+            && let Some(device) = device.as_mut()
         {
             if state.enabled {
-                let _ = device.enable(feature);
+                let _ = device.enable(feature).ok();
             } else {
-                let _ = device.disable(feature);
+                let _ = device.disable(feature).ok();
             }
         }
 
@@ -45,9 +45,9 @@ fn feature_ui(
             );
 
             if (input.changed() || slider.changed())
-                && let Some(device) = device
+                && let Some(device) = device.as_mut()
             {
-                let _ = device.set_slider(feature, state.value);
+                let _ = device.set_slider(feature, state.value).ok();
             }
         });
     });
@@ -75,22 +75,29 @@ const EQ_LABELS: [&str; 10] = [
 ];
 
 pub struct BlasterApp {
-    device: Option<BlasterXG6>,
-    surround: FeatureState,
-    crystalizer: FeatureState,
-    bass: FeatureState,
-    smart_volume: FeatureState,
-    dialog_plus: FeatureState,
-    night_mode: bool,
-    eq_enabled: bool,
-    eq_bands: [f32; 10], // dB values (-12.0 to +12.0)
+    pub(crate) device: Option<BlasterXG6>,
+    pub(crate) surround: FeatureState,
+    pub(crate) crystalizer: FeatureState,
+    pub(crate) bass: FeatureState,
+    pub(crate) smart_volume: FeatureState,
+    pub(crate) dialog_plus: FeatureState,
+    pub(crate) night_mode: bool,
+    pub(crate) loud_mode: bool,
+    pub(crate) eq_enabled: bool,
+    pub(crate) eq_bands: [f32; 10], // dB values (-12.0 to +12.0)
+    // Presets
+    pub(crate) presets: Vec<Preset>,
+    pub(crate) selected_preset: Option<usize>,
+    pub(crate) save_preset_name: String,
+    pub(crate) preset_error: Option<String>,
+    pub(crate) show_file_picker: bool,
     // Debug
-    ui_scale: f32,
+    pub(crate) ui_scale: f32,
 }
 
 impl BlasterApp {
     pub fn new(device: Option<BlasterXG6>) -> Self {
-        Self {
+        let mut app = Self {
             device,
             surround: FeatureState::default(),
             crystalizer: FeatureState::default(),
@@ -98,10 +105,23 @@ impl BlasterApp {
             smart_volume: FeatureState::default(),
             dialog_plus: FeatureState::default(),
             night_mode: false,
+            loud_mode: false,
             eq_enabled: false,
             eq_bands: [0.0; 10], // All bands at 0 dB
+            presets: Vec::new(),
+            selected_preset: None,
+            save_preset_name: String::new(),
+            preset_error: None,
+            show_file_picker: false,
             ui_scale: 1.5,
-        }
+        };
+        app.refresh_presets();
+        app
+    }
+
+    fn refresh_presets(&mut self) {
+        self.presets = crate::list_presets().unwrap_or_default();
+        self.preset_error = None;
     }
 
     /// Get the EqBand for a given index (0-9)
@@ -110,15 +130,36 @@ impl BlasterApp {
     }
 
     /// Reset all UI state to defaults
-    fn reset_ui(&mut self) {
+    pub(crate) fn reset_ui(&mut self) {
         self.surround = FeatureState::default();
         self.crystalizer = FeatureState::default();
         self.bass = FeatureState::default();
         self.smart_volume = FeatureState::default();
         self.dialog_plus = FeatureState::default();
         self.night_mode = false;
+        self.loud_mode = false;
         self.eq_enabled = false;
         self.eq_bands = [0.0; 10];
+    }
+
+    /// Sync UI state from device state
+    fn sync_ui_from_device(&mut self) {
+        if let Some(device) = &self.device {
+            self.surround.enabled = device.surround_sound_enabled;
+            self.surround.value = device.surround_sound_value;
+            self.crystalizer.enabled = device.crystalizer_enabled;
+            self.crystalizer.value = device.crystalizer_value;
+            self.bass.enabled = device.bass_enabled;
+            self.bass.value = device.bass_value;
+            self.smart_volume.enabled = device.smart_volume_enabled;
+            self.smart_volume.value = device.smart_volume_value;
+            self.dialog_plus.enabled = device.dialog_plus_enabled;
+            self.dialog_plus.value = device.dialog_plus_value;
+            self.night_mode = device.night_mode_enabled;
+            self.loud_mode = device.loud_mode_enabled;
+            self.eq_enabled = device.equalizer_enabled;
+            self.eq_bands = device.eq_bands;
+        }
     }
 }
 
@@ -178,35 +219,35 @@ impl BlasterApp {
             ui.vertical(|ui| {
                 feature_ui(
                     ui,
-                    &self.device,
+                    &mut self.device,
                     &mut self.surround,
                     "Surround Sound",
                     SoundFeature::SurroundSound,
                 );
                 feature_ui(
                     ui,
-                    &self.device,
+                    &mut self.device,
                     &mut self.crystalizer,
                     "Crystalizer",
                     SoundFeature::Crystalizer,
                 );
                 feature_ui(
                     ui,
-                    &self.device,
+                    &mut self.device,
                     &mut self.bass,
                     "Bass",
                     SoundFeature::Bass,
                 );
                 feature_ui(
                     ui,
-                    &self.device,
+                    &mut self.device,
                     &mut self.smart_volume,
                     "Smart Volume",
                     SoundFeature::SmartVolume,
                 );
                 feature_ui(
                     ui,
-                    &self.device,
+                    &mut self.device,
                     &mut self.dialog_plus,
                     "Dialog Plus",
                     SoundFeature::DialogPlus,
@@ -215,7 +256,7 @@ impl BlasterApp {
 
             ui.add_space(16.0);
 
-            // Column: Toggles (Night Mode + Equalizer)
+            // Column: Toggles (Night Mode + Loud Mode + Equalizer)
             ui.vertical(|ui| {
                 ui.label(
                     egui::RichText::new("Toggles")
@@ -225,23 +266,45 @@ impl BlasterApp {
 
                 // Night Mode toggle
                 if ui.checkbox(&mut self.night_mode, "🌙 Night Mode").changed()
-                    && let Some(device) = &self.device
+                    && let Some(device) = self.device.as_mut()
                 {
                     if self.night_mode {
-                        let _ = device.enable(SoundFeature::NightMode);
+                        // Disable loud mode when enabling night mode
+                        if self.loud_mode {
+                            self.loud_mode = false;
+                            let _ = device.disable(SoundFeature::LoudMode).ok();
+                        }
+                        let _ = device.enable(SoundFeature::NightMode).ok();
                     } else {
-                        let _ = device.disable(SoundFeature::NightMode);
+                        let _ = device.disable(SoundFeature::NightMode).ok();
+                    }
+                }
+
+                // Loud Mode toggle
+                if ui.checkbox(&mut self.loud_mode, "🔊 Loud Mode").changed()
+                    && let Some(device) = self.device.as_mut()
+                {
+                    if self.loud_mode {
+                        // Disable night mode when enabling loud mode
+                        if self.night_mode {
+                            self.night_mode = false;
+                            let _ =
+                                device.disable(SoundFeature::NightMode).ok();
+                        }
+                        let _ = device.enable(SoundFeature::LoudMode).ok();
+                    } else {
+                        let _ = device.disable(SoundFeature::LoudMode).ok();
                     }
                 }
 
                 // Equalizer toggle
                 if ui.checkbox(&mut self.eq_enabled, "🎚 Equalizer").changed()
-                    && let Some(device) = &self.device
+                    && let Some(device) = self.device.as_mut()
                 {
                     if self.eq_enabled {
-                        let _ = device.enable(SoundFeature::Equalizer);
+                        let _ = device.enable(SoundFeature::Equalizer).ok();
                     } else {
-                        let _ = device.disable(SoundFeature::Equalizer);
+                        let _ = device.disable(SoundFeature::Equalizer).ok();
                     }
                 }
             });
@@ -257,12 +320,215 @@ impl BlasterApp {
                 ui.add_space(4.0);
 
                 if ui.button("🔄 Reset All").clicked() {
-                    if let Some(device) = &self.device {
-                        let _ = device.reset();
+                    if let Some(device) = self.device.as_mut() {
+                        let _ = device.reset().ok();
                     }
                     self.reset_ui();
                 }
+
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(4.0);
+
+                // Presets section
+                ui.label(
+                    egui::RichText::new("Presets")
+                        .color(egui::Color32::from_rgb(220, 220, 230)),
+                );
+                ui.add_space(4.0);
+
+                // Save preset
+                ui.label("Save Current Settings:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.save_preset_name)
+                        .desired_width(150.0),
+                );
+                if ui.button("💾 Save Preset").clicked() {
+                    if let Some(device) = &self.device {
+                        if !self.save_preset_name.trim().is_empty() {
+                            match crate::save_preset(
+                                device,
+                                self.save_preset_name.clone(),
+                            ) {
+                                Ok(_) => {
+                                    self.save_preset_name.clear();
+                                    self.refresh_presets();
+                                    self.preset_error = None;
+                                }
+                                Err(e) => {
+                                    self.preset_error =
+                                        Some(format!("Failed to save: {}", e));
+                                }
+                            }
+                        } else {
+                            self.preset_error =
+                                Some("Preset name cannot be empty".to_string());
+                        }
+                    } else {
+                        self.preset_error =
+                            Some("Device not connected".to_string());
+                    }
+                }
+
+                // Error message
+                if let Some(error) = &self.preset_error {
+                    ui.colored_label(egui::Color32::LIGHT_RED, error);
+                }
+
+                ui.add_space(4.0);
+
+                // Load preset dropdown
+                if !self.presets.is_empty() {
+                    let preset_names: Vec<String> =
+                        self.presets.iter().map(|p| p.name.clone()).collect();
+
+                    let mut selected_idx = self.selected_preset.unwrap_or(0);
+                    if selected_idx >= preset_names.len() {
+                        selected_idx = 0;
+                    }
+
+                    egui::ComboBox::from_id_salt("preset_selector")
+                        .selected_text(if preset_names.is_empty() {
+                            "No presets"
+                        } else {
+                            &preset_names[selected_idx]
+                        })
+                        .show_ui(ui, |ui| {
+                            for (idx, name) in preset_names.iter().enumerate() {
+                                if ui
+                                    .selectable_value(
+                                        &mut selected_idx,
+                                        idx,
+                                        name,
+                                    )
+                                    .clicked()
+                                {
+                                    self.selected_preset = Some(idx);
+                                }
+                            }
+                        });
+
+                    self.selected_preset = Some(selected_idx);
+
+                    ui.add_space(4.0);
+
+                    // Load and Delete buttons
+                    ui.horizontal(|ui| {
+                        if ui.button("📂 Load").clicked()
+                            && let Some(idx) = self.selected_preset
+                        {
+                            if let Some(device) = self.device.as_mut() {
+                                if let Some(preset) = self.presets.get(idx) {
+                                    match crate::load_preset(device, preset) {
+                                        Ok(_) => {
+                                            // Sync UI state with device state
+                                            self.sync_ui_from_device();
+                                            self.preset_error = None;
+                                        }
+                                        Err(e) => {
+                                            self.preset_error = Some(format!(
+                                                "Failed to load: {}",
+                                                e
+                                            ));
+                                        }
+                                    }
+                                }
+                            } else {
+                                self.preset_error =
+                                    Some("Device not connected".to_string());
+                            }
+                        }
+
+                        if ui.button("🗑 Delete").clicked()
+                            && let Some(idx) = self.selected_preset
+                            && let Some(preset) = self.presets.get(idx)
+                        {
+                            match crate::delete_preset(preset) {
+                                Ok(_) => {
+                                    self.refresh_presets();
+                                    self.selected_preset = None;
+                                    self.preset_error = None;
+                                }
+                                Err(e) => {
+                                    self.preset_error = Some(format!(
+                                        "Failed to delete: {}",
+                                        e
+                                    ));
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    ui.label(
+                        egui::RichText::new("No presets saved")
+                            .small()
+                            .color(egui::Color32::GRAY),
+                    );
+                }
+
+                // Refresh button
+                if ui.button("🔄 Refresh").clicked() {
+                    self.refresh_presets();
+                }
+
+                ui.add_space(4.0);
+
+                // File picker button
+                if ui.button("📁 Load from File...").clicked() {
+                    self.show_file_picker = true;
+                }
             });
+
+            // File picker dialog (using native file dialog)
+            if self.show_file_picker {
+                self.show_file_picker = false;
+                if let Some(device) = self.device.as_mut() {
+                    // Use native file dialog
+                    let file_path = rfd::FileDialog::new()
+                        .add_filter("JSON Presets", &["json"])
+                        .set_title("Load Preset")
+                        .pick_file();
+
+                    if let Some(path) = file_path {
+                        match std::fs::read_to_string(&path) {
+                            Ok(json) => {
+                                match serde_json::from_str::<Preset>(&json) {
+                                    Ok(preset) => {
+                                        match crate::load_preset(
+                                            device, &preset,
+                                        ) {
+                                            Ok(_) => {
+                                                self.sync_ui_from_device();
+                                                self.preset_error = None;
+                                            }
+                                            Err(e) => {
+                                                self.preset_error =
+                                                    Some(format!(
+                                                        "Failed to load: {}",
+                                                        e
+                                                    ));
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        self.preset_error = Some(format!(
+                                            "Invalid preset file: {}",
+                                            e
+                                        ));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                self.preset_error =
+                                    Some(format!("Failed to read file: {}", e));
+                            }
+                        }
+                    }
+                } else {
+                    self.preset_error =
+                        Some("Device not connected".to_string());
+                }
+            }
         });
 
         ui.add_space(16.0);
@@ -278,7 +544,7 @@ impl BlasterApp {
 
         ui.add_enabled_ui(self.eq_enabled, |ui| {
             ui.horizontal(|ui| {
-                for i in 0..10 {
+                for (i, label) in EQ_LABELS.iter().enumerate() {
                     ui.vertical(|ui| {
                         // Compact dB value input (no suffix, integer display)
                         let input = ui.add(
@@ -301,16 +567,17 @@ impl BlasterApp {
                         );
 
                         if input.changed() || slider.changed() {
-                            if let Some(device) = &self.device {
-                                let band = self.get_eq_band(i);
-                                let _ = device
-                                    .set_eq_band_db(band, self.eq_bands[i]);
+                            let band = self.get_eq_band(i);
+                            let db_value = self.eq_bands[i];
+                            if let Some(device) = self.device.as_mut() {
+                                let _ =
+                                    device.set_eq_band_db(band, db_value).ok();
                             }
                         }
 
                         // Frequency label
                         ui.label(
-                            egui::RichText::new(EQ_LABELS[i])
+                            egui::RichText::new(*label)
                                 .small()
                                 .color(egui::Color32::GRAY),
                         );
@@ -327,13 +594,11 @@ impl BlasterApp {
             ui.collapsing("🔧 Debug", |ui| {
                 ui.horizontal(|ui| {
                     ui.label("UI Scale:");
-                    if ui
-                        .add(
-                            egui::Slider::new(&mut self.ui_scale, 0.5..=3.0)
-                                .step_by(0.1),
-                        )
-                        .changed()
-                    {}
+                    ui.add(
+                        egui::Slider::new(&mut self.ui_scale, 0.5..=3.0)
+                            .step_by(0.1),
+                    )
+                    .changed();
                     if ui.button("Reset").clicked() {
                         self.ui_scale = 1.5;
                     }
@@ -382,4 +647,3 @@ impl BlasterApp {
         }
     }
 }
-
