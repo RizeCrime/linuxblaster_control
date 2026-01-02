@@ -55,7 +55,7 @@ Requires Rust 2024 edition (nightly) and system dependencies for hidapi and egui
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/linuxblaster_control.git
+git clone https://github.com/RizeCrime/linuxblaster_control.git
 cd linuxblaster_control
 
 # Build release binary
@@ -142,9 +142,9 @@ This project builds upon the USB protocol research from the [soundblaster-x-g6-c
 
 ## AI Disclaimer 
 
-As much as I enjoyed reverse engineering the protocol and writing the backend, I only have surface level knowledge of egui/eframe and don't much care for GUI design. 
-As such, about half of the [UI](src/ui.rs) was written by AI. 
-If you see anything wrong with it, please open an issue. 
+As much as I enjoyed reverse engineering the protocol and writing the backend, I only have surface-level knowledge of egui/eframe and don't much care for GUI design.
+As such, about half of the [UI](src/ui.rs) was written by AI.
+This README was also beautified by AI.
 
 ## License
 
