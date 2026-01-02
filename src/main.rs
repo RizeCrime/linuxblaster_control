@@ -1,10 +1,6 @@
-#![allow(unused)]
-
-mod ui;
-
 use blaster_x_g6_control::BlasterXG6;
+use blaster_x_g6_control::ui::BlasterApp;
 use eframe::egui;
-use ui::BlasterApp;
 
 fn main() -> eframe::Result<()> {
     let device = BlasterXG6::init().ok();

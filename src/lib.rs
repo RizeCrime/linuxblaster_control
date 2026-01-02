@@ -1,9 +1,15 @@
-#![allow(unused)]
-
 use hidapi::{DeviceInfo, HidApi, HidDevice};
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::fs;
 use std::io::ErrorKind;
+use std::path::PathBuf;
+
+pub mod ui;
+
+#[cfg(test)]
+mod tests;
 
 pub const VENDOR_ID: u16 = 0x041e;
 pub const PRODUCT_ID: u16 = 0x3256;
@@ -19,6 +25,23 @@ pub fn value_to_bytes(value: u8) -> [u8; 4] {
 pub struct BlasterXG6 {
     pub device: DeviceInfo,
     pub connection: HidDevice,
+    // Feature states (with sliders)
+    pub surround_sound_enabled: bool,
+    pub surround_sound_value: u8,
+    pub crystalizer_enabled: bool,
+    pub crystalizer_value: u8,
+    pub bass_enabled: bool,
+    pub bass_value: u8,
+    pub smart_volume_enabled: bool,
+    pub smart_volume_value: u8,
+    pub dialog_plus_enabled: bool,
+    pub dialog_plus_value: u8,
+    // Toggle features
+    pub night_mode_enabled: bool,
+    pub loud_mode_enabled: bool,
+    pub equalizer_enabled: bool,
+    // EQ bands (dB values, -12.0 to +12.0)
+    pub eq_bands: [f32; 10],
 }
 
 impl BlasterXG6 {
@@ -37,23 +60,39 @@ impl BlasterXG6 {
             )))?;
 
         let connection = device.open_device(&api)?;
-        connection.set_blocking_mode(false);
+        let _ = connection.set_blocking_mode(false);
 
         Ok(Self {
             device: device.clone(),
             connection,
+            // Initialize all feature states to defaults
+            surround_sound_enabled: false,
+            surround_sound_value: 50,
+            crystalizer_enabled: false,
+            crystalizer_value: 50,
+            bass_enabled: false,
+            bass_value: 50,
+            smart_volume_enabled: false,
+            smart_volume_value: 50,
+            dialog_plus_enabled: false,
+            dialog_plus_value: 50,
+            night_mode_enabled: false,
+            loud_mode_enabled: false,
+            equalizer_enabled: false,
+            eq_bands: [0.0; 10],
         })
     }
 
     /// - sets all Features to OFF
     /// - sets all EQ bands to 0 dB
-    pub fn reset(&self) -> Result<(), Box<dyn Error>> {
+    pub fn reset(&mut self) -> Result<(), Box<dyn Error>> {
         self.disable(SoundFeature::SurroundSound)?;
         self.disable(SoundFeature::Crystalizer)?;
         self.disable(SoundFeature::Bass)?;
         self.disable(SoundFeature::SmartVolume)?;
         self.disable(SoundFeature::DialogPlus)?;
         self.disable(SoundFeature::NightMode)?;
+        self.disable(SoundFeature::LoudMode)?;
         self.disable(SoundFeature::Equalizer)?;
 
         for band in Equalizer::default().bands() {
@@ -63,56 +102,120 @@ impl BlasterXG6 {
         Ok(())
     }
 
-    pub fn enable(&self, feature: SoundFeature) -> Result<(), Box<dyn Error>> {
+    pub fn enable(
+        &mut self,
+        feature: SoundFeature,
+    ) -> Result<(), Box<dyn Error>> {
         let value = match feature {
             // NightMode uses special float value 2.0 (200/100)
-            SoundFeature::NightMode => 200,
-            _ => 100,
+            SoundFeature::NightMode => {
+                self.night_mode_enabled = true;
+                self.loud_mode_enabled = false; // Mutually exclusive
+                200
+            }
+            SoundFeature::LoudMode => {
+                self.loud_mode_enabled = true;
+                self.night_mode_enabled = false; // Mutually exclusive
+                100
+            }
+            SoundFeature::SurroundSound => {
+                self.surround_sound_enabled = true;
+                100
+            }
+            SoundFeature::Crystalizer => {
+                self.crystalizer_enabled = true;
+                100
+            }
+            SoundFeature::Bass => {
+                self.bass_enabled = true;
+                100
+            }
+            SoundFeature::SmartVolume => {
+                self.smart_volume_enabled = true;
+                100
+            }
+            SoundFeature::DialogPlus => {
+                self.dialog_plus_enabled = true;
+                100
+            }
+            SoundFeature::Equalizer => {
+                self.equalizer_enabled = true;
+                100
+            }
+            SoundFeature::EqBand(_) => 100, // EQ bands don't have enable/disable
         };
-        let payload = self.create_payload(feature.id(), value)?;
+        let payload = Self::create_payload(feature.id(), value)?;
         self.send_payload(&payload)?;
         Ok(())
     }
 
-    pub fn disable(&self, feature: SoundFeature) -> Result<(), Box<dyn Error>> {
-        let value = match feature {
-            // Disabling NightMode = Loud mode (1.0 = 100)
-            SoundFeature::NightMode => 100,
-            _ => 0,
-        };
-        let payload = self.create_payload(feature.id(), value)?;
+    pub fn disable(
+        &mut self,
+        feature: SoundFeature,
+    ) -> Result<(), Box<dyn Error>> {
+        match feature {
+            SoundFeature::NightMode => self.night_mode_enabled = false,
+            SoundFeature::LoudMode => self.loud_mode_enabled = false,
+            SoundFeature::SurroundSound => self.surround_sound_enabled = false,
+            SoundFeature::Crystalizer => self.crystalizer_enabled = false,
+            SoundFeature::Bass => self.bass_enabled = false,
+            SoundFeature::SmartVolume => self.smart_volume_enabled = false,
+            SoundFeature::DialogPlus => self.dialog_plus_enabled = false,
+            SoundFeature::Equalizer => self.equalizer_enabled = false,
+            SoundFeature::EqBand(_) => {} // EQ bands don't have enable/disable
+        }
+        let payload = Self::create_payload(feature.id(), 0)?;
         self.send_payload(&payload)?;
         Ok(())
     }
 
     pub fn set_slider(
-        &self,
+        &mut self,
         feature: SoundFeature,
         value: u8,
     ) -> Result<(), Box<dyn Error>> {
-        let payload = self.create_payload(feature.id() + 1, value)?;
+        match feature {
+            SoundFeature::SurroundSound => self.surround_sound_value = value,
+            SoundFeature::Crystalizer => self.crystalizer_value = value,
+            SoundFeature::Bass => self.bass_value = value,
+            SoundFeature::SmartVolume => self.smart_volume_value = value,
+            SoundFeature::DialogPlus => self.dialog_plus_value = value,
+            _ => {} // Other features don't have sliders
+        }
+        let payload = Self::create_payload(feature.id() + 1, value)?;
         self.send_payload(&payload)?;
         Ok(())
     }
 
     pub fn set_eq_band(
-        &self,
+        &mut self,
         band: EqBand,
         value: u8,
     ) -> Result<(), Box<dyn Error>> {
-        let payload = self.create_payload(band.feature_id, value)?;
-        self.send_payload(&payload)?;
-        Ok(())
+        // Convert u8 (0-100) to dB value (-12.0 to +12.0)
+        // Assuming 0 = -12dB, 50 = 0dB, 100 = +12dB
+        let db_value = ((value as f32 / 100.0) * 24.0) - 12.0;
+        self.set_eq_band_db(band, db_value)
     }
 
     /// Set EQ band using raw dB value, clamped to -12.0..=12.0
     pub fn set_eq_band_db(
-        &self,
+        &mut self,
         band: EqBand,
         db_value: f32,
     ) -> Result<(), Box<dyn Error>> {
         let clamped = db_value.clamp(-12.0, 12.0);
-        let payload = self.create_payload_raw(band.feature_id, clamped)?;
+
+        // Update the corresponding EQ band value
+        let eq_bands = Equalizer::default().bands();
+        if let Some(index) = eq_bands
+            .iter()
+            .position(|b| b.feature_id == band.feature_id)
+        {
+            self.eq_bands[index] = clamped;
+        }
+
+        let payload = Self::create_payload_raw(band.feature_id, clamped)?;
         self.send_payload(&payload)?;
         Ok(())
     }
@@ -124,16 +227,14 @@ impl BlasterXG6 {
     }
 
     pub fn create_payload(
-        &self,
         feature_id: u8,
         value: u8,
     ) -> Result<Payload, Box<dyn Error>> {
-        self.create_payload_raw(feature_id, value as f32 / 100.0)
+        Self::create_payload_raw(feature_id, value as f32 / 100.0)
     }
 
     /// Create payload with raw float value (no normalization)
     pub fn create_payload_raw(
-        &self,
         feature_id: u8,
         value: f32,
     ) -> Result<Payload, Box<dyn Error>> {
@@ -178,6 +279,216 @@ impl BlasterXG6 {
 
         Ok(payload)
     }
+
+    /// Create a preset from the current device state
+    pub fn to_preset(&self, name: String) -> Preset {
+        let mut features = Vec::new();
+
+        // Add slider features with their values
+        if self.surround_sound_enabled {
+            features
+                .push((SoundFeature::SurroundSound, self.surround_sound_value));
+        }
+        if self.crystalizer_enabled {
+            features.push((SoundFeature::Crystalizer, self.crystalizer_value));
+        }
+        if self.bass_enabled {
+            features.push((SoundFeature::Bass, self.bass_value));
+        }
+        if self.smart_volume_enabled {
+            features.push((SoundFeature::SmartVolume, self.smart_volume_value));
+        }
+        if self.dialog_plus_enabled {
+            features.push((SoundFeature::DialogPlus, self.dialog_plus_value));
+        }
+
+        // Add toggle features (value 100 = enabled, 0 = disabled)
+        if self.night_mode_enabled {
+            features.push((SoundFeature::NightMode, 200)); // Special value for NightMode
+        }
+        if self.loud_mode_enabled {
+            features.push((SoundFeature::LoudMode, 100));
+        }
+        if self.equalizer_enabled {
+            features.push((SoundFeature::Equalizer, 100));
+        }
+
+        // Add EQ bands
+        let mut eq_bands = Vec::new();
+        let eq_band_defs = Equalizer::default().bands();
+        for (i, band) in eq_band_defs.iter().enumerate() {
+            eq_bands.push((*band, self.eq_bands[i]));
+        }
+
+        Preset {
+            name,
+            features,
+            eq_bands,
+        }
+    }
+
+    /// Apply a preset to the device
+    pub fn apply_preset(
+        &mut self,
+        preset: &Preset,
+    ) -> Result<(), Box<dyn Error>> {
+        // First, reset everything to a clean state
+        self.reset()?;
+
+        // Apply features
+        for (feature, value) in &preset.features {
+            match feature {
+                SoundFeature::SurroundSound
+                | SoundFeature::Crystalizer
+                | SoundFeature::Bass
+                | SoundFeature::SmartVolume
+                | SoundFeature::DialogPlus => {
+                    if *value > 0 {
+                        self.enable(*feature)?;
+                        self.set_slider(*feature, *value)?;
+                    }
+                }
+                SoundFeature::NightMode
+                | SoundFeature::LoudMode
+                | SoundFeature::Equalizer => {
+                    if *value > 0 {
+                        self.enable(*feature)?;
+                    }
+                }
+                SoundFeature::EqBand(_) => {
+                    // EQ bands are handled separately
+                }
+            }
+        }
+
+        // Apply EQ bands
+        for (band, db_value) in &preset.eq_bands {
+            self.set_eq_band_db(*band, *db_value)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Get the presets directory path
+pub fn presets_dir() -> Result<PathBuf, Box<dyn Error>> {
+    let home = std::env::var("HOME")
+        .map_err(|_| "HOME environment variable not set")?;
+    let mut path = PathBuf::from(home);
+    path.push(".config");
+    path.push("blaster_x_g6_control");
+    path.push("presets");
+    Ok(path)
+}
+
+/// Ensure the presets directory exists
+pub fn ensure_presets_dir() -> Result<PathBuf, Box<dyn Error>> {
+    let dir = presets_dir()?;
+    fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
+/// Get the file path for a preset
+pub fn preset_path(name: &str) -> Result<PathBuf, Box<dyn Error>> {
+    let mut path = presets_dir()?;
+    // Sanitize filename
+    let sanitized = name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    path.push(format!("{}.json", sanitized));
+    Ok(path)
+}
+
+/// saves current settings to a preset
+pub fn save_preset(
+    device: &BlasterXG6,
+    name: String,
+) -> Result<(), Box<dyn Error>> {
+    let preset = device.to_preset(name.clone());
+    let path = preset_path(&name)?;
+    ensure_presets_dir()?;
+
+    let json = serde_json::to_string_pretty(&preset)?;
+    fs::write(&path, json)?;
+    Ok(())
+}
+
+/// loads a preset from disk and applies it
+pub fn load_preset(
+    device: &mut BlasterXG6,
+    preset: &Preset,
+) -> Result<(), Box<dyn Error>> {
+    device.apply_preset(preset)?;
+    Ok(())
+}
+
+/// loads a preset by name from disk
+pub fn load_preset_by_name(
+    device: &mut BlasterXG6,
+    name: &str,
+) -> Result<(), Box<dyn Error>> {
+    let path = preset_path(name)?;
+    let json = fs::read_to_string(&path)?;
+    let preset: Preset = serde_json::from_str(&json)?;
+    load_preset(device, &preset)
+}
+
+/// removes a preset from disk
+pub fn delete_preset(preset: &Preset) -> Result<(), Box<dyn Error>> {
+    let path = preset_path(&preset.name)?;
+    if path.exists() {
+        fs::remove_file(&path)?;
+    }
+    Ok(())
+}
+
+/// removes a preset by name from disk
+pub fn delete_preset_by_name(name: &str) -> Result<(), Box<dyn Error>> {
+    let path = preset_path(name)?;
+    if path.exists() {
+        fs::remove_file(&path)?;
+    }
+    Ok(())
+}
+
+/// lists all presets on disk
+pub fn list_presets() -> Result<Vec<Preset>, Box<dyn Error>> {
+    let dir = presets_dir()?;
+    let mut presets = Vec::new();
+
+    if !dir.exists() {
+        return Ok(presets);
+    }
+
+    for entry in fs::read_dir(&dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.extension().and_then(|s| s.to_str()) == Some("json") {
+            match fs::read_to_string(&path) {
+                Ok(json) => {
+                    if let Ok(preset) = serde_json::from_str::<Preset>(&json) {
+                        presets.push(preset);
+                    }
+                }
+                Err(_) => {
+                    // Skip files that can't be read or parsed
+                    continue;
+                }
+            }
+        }
+    }
+
+    // Sort by name
+    presets.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(presets)
 }
 
 #[derive(Debug)]
@@ -188,7 +499,7 @@ pub struct Payload {
 
 /// # Feature IDs
 /// Sliders are feature_id + 1
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum SoundFeature {
     SurroundSound,
     Crystalizer,
@@ -196,6 +507,7 @@ pub enum SoundFeature {
     SmartVolume,
     DialogPlus,
     NightMode,
+    LoudMode,
     Equalizer,
     EqBand(EqBand),
 }
@@ -211,13 +523,14 @@ impl SoundFeature {
             SoundFeature::SmartVolume => 0x04,
             SoundFeature::DialogPlus => 0x02,
             SoundFeature::NightMode => 0x06,
+            SoundFeature::LoudMode => 0x06,
             SoundFeature::Equalizer => 0x09,
             SoundFeature::EqBand(band) => band.feature_id,
         }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct EqBand {
     pub value: u8,
     pub feature_id: u8,
@@ -321,4 +634,12 @@ pub enum Slider {
 pub struct SliderValue {
     pub value: u8,
     pub hex: String,
+}
+
+/// Preset structure for saving/loading device configurations
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Preset {
+    pub name: String,
+    pub features: Vec<(SoundFeature, u8)>,
+    pub eq_bands: Vec<(EqBand, f32)>,
 }

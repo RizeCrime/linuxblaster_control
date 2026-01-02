@@ -16,6 +16,15 @@ Toggles and sliders work for:
 - Night Mode
 - 10-Band Equalizer (31Hz – 16kHz, ±12 dB)
 
+**Preset Management** — Save and load custom configurations
+
+## Presets
+
+Presets are stored as JSON files in `~/.config/blaster_x_g6_control/presets/`.
+
+> [!IMPORTANT]
+> The preset format is custom to this application and is **not compatible** with official Creative Sound Blaster Command profiles (.json or .xml) from Windows.
+
 ## Requirements
 
 - Linux (tested on x86_64)
@@ -101,10 +110,8 @@ If the device is not detected, the UI will display a warning but remain function
 
 ### Current Limitations
 
-- **No config persistence** — Settings are not saved between sessions
-- **No import/export** — Cannot save or load presets or EQ profiles
-- **No state reading** — Cannot read current device state, only send commands
-- **Limited testing** — Tested only on the developer's hardware
+- **No state reading** — Cannot read current device state from the hardware on startup; the application starts with default values.
+- **Limited testing** — Tested only on the developer's hardware.
 
 ### Known Issues
 
@@ -131,6 +138,12 @@ Contributions are welcome! If you have a Sound Blaster X G6 and want to help:
 ## Acknowledgments
 
 This project builds upon the USB protocol research from the [soundblaster-x-g6-cli](https://github.com/nils-skowasch/soundblaster-x-g6-cli) project by Nils Skowasch, which provided initial USB packet captures and protocol documentation. Additional reverse engineering (including the 10-band EQ protocol) was done for this project.
+
+## AI Disclaimer 
+
+As much as I enjoyed reverse engineering the protocol and writing the backend, I only have surface level knowledge of egui/eframe and don't much care for GUI design. 
+As such, about half of the [UI](src/ui.rs) was written by AI. 
+If you see anything wrong with it, please open an issue. 
 
 ## License
 

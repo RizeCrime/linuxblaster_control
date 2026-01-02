@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 eframe = "0.33.3"
 hidapi = "2.6.4"
+rfd = "0.16.0"
+serde = "1.0.228"
+serde_json = "1.0.148"
