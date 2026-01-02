@@ -13,7 +13,7 @@ Toggles and sliders work for:
 - Bass
 - Smart Volume
 - Dialog Plus
-- Night Mode
+- Night Mode & Loud Mode 
 - 10-Band Equalizer (31Hz – 16kHz, ±12 dB)
 
 **Preset Management** — Save and load custom configurations
@@ -115,8 +115,9 @@ If the device is not detected, the UI will display a warning but remain function
 
 ### Known Issues
 
-- The USB protocol was reverse-engineered and may not cover all device features
-- Some features available in the Windows Sound Blaster Command software are not yet implemented
+- **Night Mode and Loud Mode are currently broken.** These features do not seem to work as expected with the current reverse-engineered protocol.
+- The USB protocol was reverse-engineered and may not cover all device features.
+- Some features available in the Windows Sound Blaster Command software are not yet implemented.
 
 ## Technical Details
 
