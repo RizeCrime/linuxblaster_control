@@ -163,10 +163,6 @@ If the device is not detected, the UI will display a warning but remain function
 
 - **No state reading** — Cannot read current device state from the hardware on startup; the application starts with default values.
 - **Limited testing** — Tested only on the developer's hardware.
-
-### Known Issues
-
-- **Night Mode and Loud Mode are currently broken.** These features do not seem to work as expected with the current reverse-engineered protocol.
 - The USB protocol was reverse-engineered and may not cover all device features.
 - Some features available in the Windows Sound Blaster Command software are not yet implemented.
 

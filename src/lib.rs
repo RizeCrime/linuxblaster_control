@@ -16,8 +16,9 @@ pub const PRODUCT_ID: u16 = 0x3256;
 pub const INTERFACE: i32 = 4;
 
 /// Convert a 0-100 value to 4 little-endian float bytes
+#[must_use]
 pub fn value_to_bytes(value: u8) -> [u8; 4] {
-    let normalized: f32 = value as f32 / 100.0;
+    let normalized: f32 = f32::from(value) / 100.0;
     normalized.to_le_bytes()
 }
 
@@ -40,6 +41,8 @@ pub struct BlasterXG6 {
     pub night_mode_enabled: bool,
     pub loud_mode_enabled: bool,
     pub equalizer_enabled: bool,
+    // EQ pre-amp (dB value, -12.0 to +12.0)
+    pub pre_amp: f32,
     // EQ bands (dB values, -12.0 to +12.0)
     pub eq_bands: [f32; 10],
 }
@@ -54,10 +57,12 @@ impl BlasterXG6 {
                     && device.product_id() == PRODUCT_ID
                     && device.interface_number() == INTERFACE
             })
-            .ok_or(Box::new(std::io::Error::new(
-                ErrorKind::NotFound,
-                "Device not found",
-            )))?;
+            .ok_or_else(|| {
+                Box::new(std::io::Error::new(
+                    ErrorKind::NotFound,
+                    "Device not found",
+                )) as Box<dyn Error>
+            })?;
 
         let connection = device.open_device(&api)?;
         let _ = connection.set_blocking_mode(false);
@@ -79,6 +84,7 @@ impl BlasterXG6 {
             night_mode_enabled: false,
             loud_mode_enabled: false,
             equalizer_enabled: false,
+            pre_amp: 0.0,
             eq_bands: [0.0; 10],
         })
     }
@@ -94,6 +100,9 @@ impl BlasterXG6 {
         self.disable(SoundFeature::NightMode)?;
         self.disable(SoundFeature::LoudMode)?;
         self.disable(SoundFeature::Equalizer)?;
+
+        // Reset pre-amp
+        self.set_pre_amp_db(0.0)?;
 
         for band in Equalizer::default().bands() {
             self.set_eq_band_db(band, 0.0)?;
@@ -111,11 +120,13 @@ impl BlasterXG6 {
             SoundFeature::NightMode => {
                 self.night_mode_enabled = true;
                 self.loud_mode_enabled = false; // Mutually exclusive
+                self.smart_volume_enabled = true; // Mode of SmartVolume
                 200
             }
             SoundFeature::LoudMode => {
                 self.loud_mode_enabled = true;
                 self.night_mode_enabled = false; // Mutually exclusive
+                self.smart_volume_enabled = true; // Mode of SmartVolume
                 100
             }
             SoundFeature::SurroundSound => {
@@ -194,8 +205,23 @@ impl BlasterXG6 {
     ) -> Result<(), Box<dyn Error>> {
         // Convert u8 (0-100) to dB value (-12.0 to +12.0)
         // Assuming 0 = -12dB, 50 = 0dB, 100 = +12dB
-        let db_value = ((value as f32 / 100.0) * 24.0) - 12.0;
+        let db_value = (f32::from(value) / 100.0).mul_add(24.0, -12.0);
         self.set_eq_band_db(band, db_value)
+    }
+
+    /// Set pre-amp using raw dB value, clamped to -12.0..=12.0
+    pub fn set_pre_amp_db(
+        &mut self,
+        db_value: f32,
+    ) -> Result<(), Box<dyn Error>> {
+        let clamped = db_value.clamp(-12.0, 12.0);
+        self.pre_amp = clamped;
+
+        let pre_amp_band = Equalizer::default().band_pre_amp;
+        let payload =
+            Self::create_payload_raw(pre_amp_band.feature_id, clamped)?;
+        self.send_payload(&payload)?;
+        Ok(())
     }
 
     /// Set EQ band using raw dB value, clamped to -12.0..=12.0
@@ -230,7 +256,7 @@ impl BlasterXG6 {
         feature_id: u8,
         value: u8,
     ) -> Result<Payload, Box<dyn Error>> {
-        Self::create_payload_raw(feature_id, value as f32 / 100.0)
+        Self::create_payload_raw(feature_id, f32::from(value) / 100.0)
     }
 
     /// Create payload with raw float value (no normalization)
@@ -281,6 +307,7 @@ impl BlasterXG6 {
     }
 
     /// Create a preset from the current device state
+    #[must_use]
     pub fn to_preset(&self, name: String) -> Preset {
         let mut features = Vec::new();
 
@@ -313,8 +340,12 @@ impl BlasterXG6 {
             features.push((SoundFeature::Equalizer, 100));
         }
 
-        // Add EQ bands
+        // Add pre-amp
         let mut eq_bands = Vec::new();
+        let pre_amp_band = Equalizer::default().band_pre_amp;
+        eq_bands.push((pre_amp_band, self.pre_amp));
+
+        // Add EQ bands
         let eq_band_defs = Equalizer::default().bands();
         for (i, band) in eq_band_defs.iter().enumerate() {
             eq_bands.push((*band, self.eq_bands[i]));
@@ -361,9 +392,13 @@ impl BlasterXG6 {
             }
         }
 
-        // Apply EQ bands
+        // Apply EQ bands (includes pre-amp)
         for (band, db_value) in &preset.eq_bands {
-            self.set_eq_band_db(*band, *db_value)?;
+            if band.feature_id == Equalizer::default().band_pre_amp.feature_id {
+                self.set_pre_amp_db(*db_value)?;
+            } else {
+                self.set_eq_band_db(*band, *db_value)?;
+            }
         }
 
         Ok(())
@@ -402,7 +437,7 @@ pub fn preset_path(name: &str) -> Result<PathBuf, Box<dyn Error>> {
             }
         })
         .collect::<String>();
-    path.push(format!("{}.json", sanitized));
+    path.push(format!("{sanitized}.json"));
     Ok(path)
 }
 
@@ -498,7 +533,7 @@ pub struct Payload {
 }
 
 /// # Feature IDs
-/// Sliders are feature_id + 1
+/// Sliders are `feature_id` + 1
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum SoundFeature {
     SurroundSound,
@@ -514,18 +549,19 @@ pub enum SoundFeature {
 
 impl SoundFeature {
     /// # Feature IDs
-    /// Sliders are feature_id + 1
-    pub fn id(&self) -> u8 {
+    /// Sliders are `feature_id` + 1
+    #[must_use]
+    pub const fn id(&self) -> u8 {
         match self {
-            SoundFeature::SurroundSound => 0x00,
-            SoundFeature::Crystalizer => 0x07,
-            SoundFeature::Bass => 0x18,
-            SoundFeature::SmartVolume => 0x04,
-            SoundFeature::DialogPlus => 0x02,
-            SoundFeature::NightMode => 0x06,
-            SoundFeature::LoudMode => 0x06,
-            SoundFeature::Equalizer => 0x09,
-            SoundFeature::EqBand(band) => band.feature_id,
+            Self::SurroundSound => 0x00,
+            Self::Crystalizer => 0x07,
+            Self::Bass => 0x18,
+            Self::SmartVolume => 0x04,
+            Self::DialogPlus => 0x02,
+            Self::NightMode => 0x06,
+            Self::LoudMode => 0x06,
+            Self::Equalizer => 0x09,
+            Self::EqBand(band) => band.feature_id,
         }
     }
 }
@@ -537,6 +573,7 @@ pub struct EqBand {
 }
 
 pub struct Equalizer {
+    pub band_pre_amp: EqBand,
     pub band_31: EqBand,
     pub band_62: EqBand,
     pub band_125: EqBand,
@@ -552,6 +589,10 @@ pub struct Equalizer {
 impl Default for Equalizer {
     fn default() -> Self {
         Self {
+            band_pre_amp: EqBand {
+                value: 0,
+                feature_id: 0x0a,
+            },
             band_31: EqBand {
                 value: 0,
                 feature_id: 0x0b,
@@ -598,7 +639,8 @@ impl Default for Equalizer {
 
 impl Equalizer {
     /// Returns all 10 EQ bands as an array
-    pub fn bands(&self) -> [EqBand; 10] {
+    #[must_use]
+    pub const fn bands(&self) -> [EqBand; 10] {
         [
             self.band_31,
             self.band_62,

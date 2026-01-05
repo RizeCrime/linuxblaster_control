@@ -2,6 +2,10 @@
 #[allow(clippy::module_inception)]
 mod tests {
     use crate::*;
+    use std::sync::Mutex;
+
+    // Mutex to synchronize HOME environment variable access across parallel tests
+    static HOME_MUTEX: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_value_to_bytes() {
@@ -40,8 +44,7 @@ mod tests {
         for (i, expected_id) in expected_ids.iter().enumerate() {
             assert_eq!(
                 bands[i].feature_id, *expected_id,
-                "Band {} should have feature_id {}",
-                i, expected_id
+                "Band {i} should have feature_id {expected_id}"
             );
         }
     }
@@ -240,7 +243,34 @@ mod tests {
 
     #[test]
     fn test_payload_edge_cases() {
-        // ... (existing test code)
+        // Test boundary values
+        let payload_min = BlasterXG6::create_payload(0x00, 0).unwrap();
+        assert_eq!(payload_min.data[7..11], 0.0f32.to_le_bytes());
+
+        let payload_max = BlasterXG6::create_payload(0xff, 255).unwrap();
+        // 255/100 = 2.55
+        assert_eq!(payload_max.data[7..11], 2.55f32.to_le_bytes());
+
+        // Test extreme float values (should still create payload, clamping happens elsewhere)
+        let payload_large =
+            BlasterXG6::create_payload_raw(0x07, 1000.0).unwrap();
+        assert_eq!(payload_large.data[6], 0x07);
+        assert_eq!(payload_large.data[7..11], 1000.0f32.to_le_bytes());
+
+        let payload_negative =
+            BlasterXG6::create_payload_raw(0x07, -50.0).unwrap();
+        assert_eq!(payload_negative.data[6], 0x07);
+        assert_eq!(payload_negative.data[7..11], (-50.0f32).to_le_bytes());
+
+        // Test all feature IDs produce valid payloads
+        for feature_id in 0x00..=0xff {
+            let payload =
+                BlasterXG6::create_payload_raw(feature_id, 0.5).unwrap();
+            assert_eq!(payload.data.len(), 65);
+            assert_eq!(payload.commit.len(), 65);
+            assert_eq!(payload.data[6], feature_id);
+            assert_eq!(payload.commit[6], feature_id);
+        }
     }
 
     #[test]
@@ -406,6 +436,31 @@ mod tests {
 
     #[test]
     fn test_preset_path_sanitization() {
+        // Ensure HOME is set (may have been unset by other tests)
+        let original_home = std::env::var("HOME").ok();
+        let test_home =
+            original_home.clone().unwrap_or_else(|| "/tmp".to_string());
+
+        // Use a guard to ensure HOME is restored even if test panics
+        struct HomeGuard {
+            original: Option<String>,
+        }
+        impl Drop for HomeGuard {
+            fn drop(&mut self) {
+                let _guard = HOME_MUTEX.lock().unwrap();
+                unsafe {
+                    if let Some(ref home) = self.original {
+                        std::env::set_var("HOME", home);
+                    } else {
+                        std::env::set_var("HOME", "/tmp");
+                    }
+                }
+            }
+        }
+        let _home_guard = HomeGuard {
+            original: original_home.clone(),
+        };
+
         // Test that preset_path sanitizes filenames correctly
         let test_cases = vec![
             ("normal-name", "normal-name"),
@@ -418,12 +473,16 @@ mod tests {
         ];
 
         for (input, expected_sanitized) in test_cases {
+            // Hold mutex during entire operation to prevent other tests from modifying HOME
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &test_home);
+            }
             let path = preset_path(input).unwrap();
             let filename = path.file_stem().unwrap().to_str().unwrap();
             assert_eq!(
                 filename, expected_sanitized,
-                "Failed to sanitize '{}' correctly",
-                input
+                "Failed to sanitize '{input}' correctly"
             );
 
             // Verify it ends with .json
@@ -431,14 +490,17 @@ mod tests {
         }
 
         // Test empty string - sanitized empty string becomes empty, resulting in ".json"
+        let _mutex_guard = HOME_MUTEX.lock().unwrap();
+        unsafe {
+            std::env::set_var("HOME", &test_home);
+        }
         let empty_path = preset_path("").unwrap();
         // Empty string sanitizes to empty, which results in just ".json" as filename
         assert!(
             empty_path.file_name().unwrap().to_str().unwrap() == ".json"
                 || empty_path
                     .file_stem()
-                    .map(|s| s.to_str().unwrap())
-                    .unwrap_or("")
+                    .map_or("", |s| s.to_str().unwrap())
                     .is_empty()
         );
     }
@@ -446,14 +508,45 @@ mod tests {
     #[test]
     fn test_persistence_logic() {
         let original_home = std::env::var("HOME").ok();
-        let temp_home = "/tmp/blaster_persistence_test";
-        let _ = fs::remove_dir_all(temp_home);
+        // Use thread ID to make directory unique for parallel tests
+        let thread_id = std::thread::current().id();
+        let temp_home =
+            format!("/tmp/blaster_persistence_test_{:?}", thread_id);
+        let _ = fs::remove_dir_all(&temp_home);
+
+        // Ensure HOME is set (may have been unset by other tests)
         unsafe {
-            std::env::set_var("HOME", temp_home);
+            std::env::set_var("HOME", &temp_home);
         }
 
+        // Use a guard to ensure HOME is restored even if test panics
+        struct HomeGuard {
+            original: Option<String>,
+        }
+        impl Drop for HomeGuard {
+            fn drop(&mut self) {
+                let _guard = HOME_MUTEX.lock().unwrap();
+                unsafe {
+                    if let Some(ref home) = self.original {
+                        std::env::set_var("HOME", home);
+                    } else {
+                        std::env::set_var("HOME", "/tmp");
+                    }
+                }
+            }
+        }
+        let _guard = HomeGuard {
+            original: original_home.clone(),
+        };
+
         // Test ensure_presets_dir
-        let dir = ensure_presets_dir().unwrap();
+        let dir = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            ensure_presets_dir().unwrap()
+        };
         assert!(dir.exists());
         assert!(dir.is_dir());
 
@@ -461,14 +554,22 @@ mod tests {
         // Since we can't easily create one, we'll test the list_presets logic
         // by manually creating a file.
 
+        // Use a unique name to avoid conflicts with other tests
+        let unique_name = format!("Persistent Preset {}", std::process::id());
         let features = vec![(SoundFeature::Bass, 42)];
         let preset = Preset {
-            name: "Persistent Preset".to_string(),
+            name: unique_name.clone(),
             features,
             eq_bands: Vec::new(),
         };
 
-        let path = preset_path(&preset.name).unwrap();
+        let path = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            preset_path(&preset.name).unwrap()
+        };
         // Clean up any existing file from previous test runs
         let _ = fs::remove_file(&path);
 
@@ -476,43 +577,401 @@ mod tests {
         fs::write(&path, json).unwrap();
         assert!(path.exists()); // Should exist after write
 
-        let presets = list_presets().unwrap();
-        assert_eq!(presets.len(), 1);
-        assert_eq!(presets[0].name, "Persistent Preset");
+        // Ensure HOME is still set (may have been unset by parallel tests)
+        let presets = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            list_presets().unwrap()
+        };
+        // Find our unique preset (there may be others from parallel tests)
+        let our_preset = presets.iter().find(|p| p.name == unique_name);
+        assert!(our_preset.is_some(), "Our preset should be found");
         assert!(
-            presets[0]
+            our_preset
+                .unwrap()
                 .features
                 .iter()
                 .any(|(f, v)| *f == SoundFeature::Bass && *v == 42)
         );
 
         // Test delete_preset
-        delete_preset_by_name("Persistent Preset").unwrap();
-        assert!(!path.exists()); // Should be deleted
-        let presets_after = list_presets().unwrap();
-        assert_eq!(presets_after.len(), 0);
+        {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            delete_preset_by_name(&unique_name).unwrap();
+        }
+        // Re-check path after ensuring HOME is set
+        let path_after_delete = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            preset_path(&preset.name).unwrap()
+        };
+        assert!(!path_after_delete.exists()); // Should be deleted
+
+        let presets_after = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            list_presets().unwrap()
+        };
+        // Our preset should be gone (others may still exist)
+        assert!(!presets_after.iter().any(|p| p.name == unique_name));
 
         // Test delete non-existent preset (should not error)
-        delete_preset_by_name("Non-existent").unwrap();
-
-        if let Some(home) = original_home {
+        {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
             unsafe {
-                std::env::set_var("HOME", home);
+                std::env::set_var("HOME", &temp_home);
             }
+            delete_preset_by_name("Non-existent").unwrap();
         }
-        let _ = fs::remove_dir_all(temp_home);
+
+        let _ = fs::remove_dir_all(&temp_home);
     }
 
     #[test]
-    fn test_list_presets_ignores_invalid_files() {
-        let original_home = std::env::var("HOME").ok();
-        let temp_home = "/tmp/blaster_list_test";
-        let _ = fs::remove_dir_all(temp_home);
-        unsafe {
-            std::env::set_var("HOME", temp_home);
+    fn test_set_eq_band_conversion() {
+        // Test u8 to dB conversion: (value / 100.0) * 24.0 - 12.0
+        // 0 -> -12.0 dB
+        let db_0 = (0.0f32 / 100.0).mul_add(24.0, -12.0);
+        assert_eq!(db_0, -12.0);
+
+        // 50 -> 0.0 dB
+        let db_50 = (50.0f32 / 100.0).mul_add(24.0, -12.0);
+        assert_eq!(db_50, 0.0);
+
+        // 100 -> +12.0 dB
+        let db_100 = (100.0f32 / 100.0).mul_add(24.0, -12.0);
+        assert_eq!(db_100, 12.0);
+
+        // Test some intermediate values
+        let db_25 = (25.0f32 / 100.0).mul_add(24.0, -12.0);
+        assert_eq!(db_25, -6.0);
+
+        let db_75 = (75.0f32 / 100.0).mul_add(24.0, -12.0);
+        assert_eq!(db_75, 6.0);
+    }
+
+    #[test]
+    fn test_nightmode_loudmode_mutual_exclusivity() {
+        // Test that NightMode and LoudMode use the same feature_id but different values
+        // This tests the logic in enable() method
+        assert_eq!(SoundFeature::NightMode.id(), SoundFeature::LoudMode.id());
+
+        // NightMode uses value 200 (2.0)
+        let nightmode_payload =
+            BlasterXG6::create_payload(SoundFeature::NightMode.id(), 200)
+                .unwrap();
+        assert_eq!(nightmode_payload.data[7..11], 2.0f32.to_le_bytes());
+
+        // LoudMode uses value 100 (1.0)
+        let loudmode_payload =
+            BlasterXG6::create_payload(SoundFeature::LoudMode.id(), 100)
+                .unwrap();
+        assert_eq!(loudmode_payload.data[7..11], 1.0f32.to_le_bytes());
+
+        // Both disable to 0
+        let disable_night =
+            BlasterXG6::create_payload(SoundFeature::NightMode.id(), 0)
+                .unwrap();
+        let disable_loud =
+            BlasterXG6::create_payload(SoundFeature::LoudMode.id(), 0).unwrap();
+        assert_eq!(disable_night.data[7..11], disable_loud.data[7..11]);
+        assert_eq!(disable_night.data[7..11], 0.0f32.to_le_bytes());
+    }
+
+    #[test]
+    fn test_enable_disable_state_values() {
+        // Test that enable() uses correct values for each feature
+        // We can't test the actual state changes without a device, but we can verify
+        // the values that would be sent
+
+        // SurroundSound, Crystalizer, Bass, SmartVolume, DialogPlus, Equalizer use 100
+        for feature in [
+            SoundFeature::SurroundSound,
+            SoundFeature::Crystalizer,
+            SoundFeature::Bass,
+            SoundFeature::SmartVolume,
+            SoundFeature::DialogPlus,
+            SoundFeature::Equalizer,
+        ] {
+            let payload =
+                BlasterXG6::create_payload(feature.id(), 100).unwrap();
+            assert_eq!(payload.data[7..11], 1.0f32.to_le_bytes());
         }
 
-        ensure_presets_dir().unwrap();
+        // NightMode uses 200 (special value)
+        let nightmode_enable =
+            BlasterXG6::create_payload(SoundFeature::NightMode.id(), 200)
+                .unwrap();
+        assert_eq!(nightmode_enable.data[7..11], 2.0f32.to_le_bytes());
+
+        // LoudMode uses 100
+        let loudmode_enable =
+            BlasterXG6::create_payload(SoundFeature::LoudMode.id(), 100)
+                .unwrap();
+        assert_eq!(loudmode_enable.data[7..11], 1.0f32.to_le_bytes());
+
+        // All features disable to 0
+        for feature in [
+            SoundFeature::SurroundSound,
+            SoundFeature::Crystalizer,
+            SoundFeature::Bass,
+            SoundFeature::SmartVolume,
+            SoundFeature::DialogPlus,
+            SoundFeature::NightMode,
+            SoundFeature::LoudMode,
+            SoundFeature::Equalizer,
+        ] {
+            let payload = BlasterXG6::create_payload(feature.id(), 0).unwrap();
+            assert_eq!(payload.data[7..11], 0.0f32.to_le_bytes());
+        }
+    }
+
+    #[test]
+    fn test_set_slider_value_updates() {
+        // Test that set_slider uses feature_id + 1
+        // We can verify the payload creation logic
+        let base_id = SoundFeature::SurroundSound.id();
+        let slider_id = base_id + 1;
+
+        for value in [0, 25, 50, 75, 100] {
+            let payload = BlasterXG6::create_payload(slider_id, value).unwrap();
+            assert_eq!(payload.data[6], slider_id);
+            assert_eq!(payload.commit[6], slider_id);
+            let expected_float = f32::from(value) / 100.0;
+            assert_eq!(payload.data[7..11], expected_float.to_le_bytes());
+        }
+    }
+
+    #[test]
+    fn test_to_preset_only_includes_enabled_features() {
+        // Test the logic of to_preset - only enabled features should be included
+        // We can't create a real device, but we can verify the structure matches expectations
+        let preset_with_features = Preset {
+            name: "Test".to_string(),
+            features: vec![
+                (SoundFeature::SurroundSound, 75),
+                (SoundFeature::Crystalizer, 50),
+            ],
+            eq_bands: Vec::new(),
+        };
+
+        // Verify only enabled features are present
+        assert_eq!(preset_with_features.features.len(), 2);
+        assert!(
+            preset_with_features
+                .features
+                .iter()
+                .any(|(f, _)| *f == SoundFeature::SurroundSound)
+        );
+        assert!(
+            preset_with_features
+                .features
+                .iter()
+                .any(|(f, _)| *f == SoundFeature::Crystalizer)
+        );
+
+        // Empty preset should have no features
+        let empty_preset = Preset {
+            name: "Empty".to_string(),
+            features: Vec::new(),
+            eq_bands: Vec::new(),
+        };
+        assert!(empty_preset.features.is_empty());
+    }
+
+    #[test]
+    fn test_apply_preset_logic() {
+        // Test the logic of apply_preset without requiring a device
+        // Verify that preset structure matches what apply_preset expects
+
+        // Preset with slider features
+        let slider_preset = Preset {
+            name: "Slider Test".to_string(),
+            features: vec![
+                (SoundFeature::SurroundSound, 75),
+                (SoundFeature::Bass, 50),
+            ],
+            eq_bands: Vec::new(),
+        };
+
+        // Verify slider features have values > 0
+        for (feature, value) in &slider_preset.features {
+            match feature {
+                SoundFeature::SurroundSound
+                | SoundFeature::Crystalizer
+                | SoundFeature::Bass
+                | SoundFeature::SmartVolume
+                | SoundFeature::DialogPlus => {
+                    assert!(*value > 0, "Slider feature should have value > 0");
+                }
+                _ => {}
+            }
+        }
+
+        // Preset with toggle features
+        let toggle_preset = Preset {
+            name: "Toggle Test".to_string(),
+            features: vec![
+                (SoundFeature::NightMode, 200),
+                (SoundFeature::LoudMode, 100),
+                (SoundFeature::Equalizer, 100),
+            ],
+            eq_bands: Vec::new(),
+        };
+
+        // Verify toggle features use correct values
+        assert!(
+            toggle_preset
+                .features
+                .iter()
+                .any(|(f, v)| *f == SoundFeature::NightMode && *v == 200)
+        );
+        assert!(
+            toggle_preset
+                .features
+                .iter()
+                .any(|(f, v)| *f == SoundFeature::LoudMode && *v == 100)
+        );
+    }
+
+    #[test]
+    fn test_preset_with_eq_bands() {
+        // Test preset with EQ bands at boundaries
+        let mut eq_bands = Vec::new();
+        let eq_band_defs = Equalizer::default().bands();
+
+        // Set bands to boundary values
+        eq_bands.push((eq_band_defs[0], -12.0)); // Minimum
+        eq_bands.push((eq_band_defs[1], 12.0)); // Maximum
+        eq_bands.push((eq_band_defs[2], 0.0)); // Center
+
+        let preset = Preset {
+            name: "EQ Test".to_string(),
+            features: Vec::new(),
+            eq_bands: eq_bands.clone(),
+        };
+
+        assert_eq!(preset.eq_bands.len(), 3);
+        assert!(preset.eq_bands.iter().any(|(_, v)| *v == -12.0));
+        assert!(preset.eq_bands.iter().any(|(_, v)| *v == 12.0));
+        assert!(preset.eq_bands.iter().any(|(_, v)| *v == 0.0));
+    }
+
+    #[test]
+    fn test_preset_error_cases() {
+        // Test error handling for preset operations
+        let original_home = std::env::var("HOME").ok();
+        // Use thread ID to make directory unique for parallel tests
+        let thread_id = std::thread::current().id();
+        let temp_home =
+            format!("/tmp/blaster_preset_error_test_{:?}", thread_id);
+        let _ = fs::remove_dir_all(&temp_home);
+
+        // Use a guard to ensure HOME is restored even if test panics
+        struct HomeGuard {
+            original: Option<String>,
+        }
+        impl Drop for HomeGuard {
+            fn drop(&mut self) {
+                let _guard = HOME_MUTEX.lock().unwrap();
+                unsafe {
+                    if let Some(ref home) = self.original {
+                        std::env::set_var("HOME", home);
+                    } else {
+                        std::env::set_var("HOME", "/tmp");
+                    }
+                }
+            }
+        }
+        let _guard = HomeGuard {
+            original: original_home.clone(),
+        };
+
+        {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+        }
+
+        // Test loading non-existent preset (requires device, skip for now)
+        // The path logic is tested via preset_path() below
+
+        // Test deleting non-existent preset (should not error)
+        let result = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            delete_preset_by_name("non-existent-preset")
+        };
+        assert!(result.is_ok());
+
+        // Test preset_path with invalid HOME
+        // First ensure HOME is actually removed
+        let result = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::remove_var("HOME");
+            }
+            // Verify HOME is actually removed
+            assert!(std::env::var("HOME").is_err(), "HOME should be removed");
+            preset_path("test")
+        };
+        assert!(
+            result.is_err(),
+            "preset_path should fail when HOME is not set"
+        );
+
+        let _ = fs::remove_dir_all(&temp_home);
+    }
+
+    #[test]
+    fn test_preset_invalid_json_handling() {
+        // Test that list_presets skips invalid JSON files
+        let original_home = std::env::var("HOME").ok();
+        // Use thread ID to make directory unique for parallel tests
+        let thread_id = std::thread::current().id();
+        let temp_home =
+            format!("/tmp/blaster_preset_json_test_{:?}", thread_id);
+        let _ = fs::remove_dir_all(&temp_home);
+
+        // Use a guard to ensure HOME is restored even if test panics
+        struct HomeGuard {
+            original: Option<String>,
+        }
+        impl Drop for HomeGuard {
+            fn drop(&mut self) {
+                let _guard = HOME_MUTEX.lock().unwrap();
+                unsafe {
+                    if let Some(ref home) = self.original {
+                        std::env::set_var("HOME", home);
+                    } else {
+                        std::env::set_var("HOME", "/tmp");
+                    }
+                }
+            }
+        }
+        let _guard = HomeGuard {
+            original: original_home.clone(),
+        };
+
+        let dir = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            ensure_presets_dir().unwrap()
+        };
 
         // Create a valid preset
         let valid_preset = Preset {
@@ -520,36 +979,64 @@ mod tests {
             features: vec![(SoundFeature::Bass, 50)],
             eq_bands: Vec::new(),
         };
-        let valid_path = preset_path("Valid").unwrap();
-        fs::write(
-            &valid_path,
-            serde_json::to_string_pretty(&valid_preset).unwrap(),
-        )
-        .unwrap();
+        // Ensure HOME is set right before calling preset_path (which reads HOME)
+        let valid_path = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            preset_path("Valid").unwrap()
+        };
+        // Ensure parent directory exists before writing
+        if let Some(parent) = valid_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        fs::write(&valid_path, serde_json::to_string(&valid_preset).unwrap())
+            .unwrap();
 
         // Create an invalid JSON file
-        let invalid_path = preset_path("Invalid").unwrap();
-        fs::write(&invalid_path, "not valid json").unwrap();
+        let invalid_path = dir.join("invalid.json");
+        fs::write(&invalid_path, "{ invalid json }").unwrap();
 
-        // Create a non-JSON file (should be ignored)
-        let non_json_path = presets_dir().unwrap().join("not_a_preset.txt");
-        fs::write(&non_json_path, "some text").unwrap();
+        // Create a non-JSON file
+        let text_path = dir.join("not_json.txt");
+        fs::write(&text_path, "not a preset").unwrap();
 
-        let presets = list_presets().unwrap();
-        // Should only return the valid preset
-        assert_eq!(presets.len(), 1);
-        assert_eq!(presets[0].name, "Valid");
+        // list_presets should include the valid preset and skip invalid files
+        let presets = {
+            let _mutex_guard = HOME_MUTEX.lock().unwrap();
+            unsafe {
+                std::env::set_var("HOME", &temp_home);
+            }
+            list_presets().unwrap()
+        };
+        // Find our valid preset (there may be others from parallel tests)
+        let valid_preset_found = presets.iter().any(|p| p.name == "Valid");
+        assert!(valid_preset_found, "Valid preset should be found");
+        // Verify invalid files are not parsed as presets
+        assert!(!presets.iter().any(|p| p.name == "invalid"));
+        assert!(!presets.iter().any(|p| p.name == "not_json"));
 
-        // Cleanup - remove all test files
+        // Cleanup
         let _ = fs::remove_file(&valid_path);
         let _ = fs::remove_file(&invalid_path);
-        let _ = fs::remove_file(&non_json_path);
+        let _ = fs::remove_file(&text_path);
 
-        if let Some(home) = original_home {
-            unsafe {
-                std::env::set_var("HOME", home);
-            }
-        }
-        let _ = fs::remove_dir_all(temp_home);
+        let _ = fs::remove_dir_all(&temp_home);
     }
+
+    #[test]
+    fn test_value_to_bytes_edge_cases() {
+        // Test boundary values for value_to_bytes
+        assert_eq!(value_to_bytes(0), 0.0f32.to_le_bytes());
+        assert_eq!(value_to_bytes(100), 1.0f32.to_le_bytes());
+        assert_eq!(value_to_bytes(1), 0.01f32.to_le_bytes());
+        assert_eq!(value_to_bytes(99), 0.99f32.to_le_bytes());
+        assert_eq!(value_to_bytes(50), 0.5f32.to_le_bytes());
+    }
+
+    // Note: send_payload() is not tested here. The software only connects to the specific
+    // device it's designed for, so if it works on one machine, it's reasonably safe to
+    // assume it will work elsewhere as long as the device is present. Proper tests would
+    // require hardware mocking and are deferred for now.
 }

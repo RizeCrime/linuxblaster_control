@@ -84,6 +84,7 @@ pub struct BlasterApp {
     pub(crate) night_mode: bool,
     pub(crate) loud_mode: bool,
     pub(crate) eq_enabled: bool,
+    pub(crate) pre_amp: f32, // dB value (-12.0 to +12.0)
     pub(crate) eq_bands: [f32; 10], // dB values (-12.0 to +12.0)
     // Presets
     pub(crate) presets: Vec<Preset>,
@@ -96,6 +97,7 @@ pub struct BlasterApp {
 }
 
 impl BlasterApp {
+    #[must_use]
     pub fn new(device: Option<BlasterXG6>) -> Self {
         let mut app = Self {
             device,
@@ -107,6 +109,7 @@ impl BlasterApp {
             night_mode: false,
             loud_mode: false,
             eq_enabled: false,
+            pre_amp: 0.0,        // Pre-amp at 0 dB
             eq_bands: [0.0; 10], // All bands at 0 dB
             presets: Vec::new(),
             selected_preset: None,
@@ -124,7 +127,7 @@ impl BlasterApp {
         self.preset_error = None;
     }
 
-    /// Get the EqBand for a given index (0-9)
+    /// Get the `EqBand` for a given index (0-9)
     fn get_eq_band(&self, index: usize) -> EqBand {
         Equalizer::default().bands()[index]
     }
@@ -139,6 +142,7 @@ impl BlasterApp {
         self.night_mode = false;
         self.loud_mode = false;
         self.eq_enabled = false;
+        self.pre_amp = 0.0;
         self.eq_bands = [0.0; 10];
     }
 
@@ -158,6 +162,7 @@ impl BlasterApp {
             self.night_mode = device.night_mode_enabled;
             self.loud_mode = device.loud_mode_enabled;
             self.eq_enabled = device.equalizer_enabled;
+            self.pre_amp = device.pre_amp;
             self.eq_bands = device.eq_bands;
         }
     }
@@ -269,10 +274,17 @@ impl BlasterApp {
                     && let Some(device) = self.device.as_mut()
                 {
                     if self.night_mode {
+                        // Automatically enable SmartVolume if it's off
+                        if !self.smart_volume.enabled {
+                            self.smart_volume.enabled = true;
+                            let _ =
+                                device.enable(SoundFeature::SmartVolume).ok();
+                        }
                         // Disable loud mode when enabling night mode
                         if self.loud_mode {
                             self.loud_mode = false;
-                            let _ = device.disable(SoundFeature::LoudMode).ok();
+                            // device.enable(NightMode) will overwrite 0x06 anyway,
+                            // but we update state for consistency.
                         }
                         let _ = device.enable(SoundFeature::NightMode).ok();
                     } else {
@@ -285,11 +297,15 @@ impl BlasterApp {
                     && let Some(device) = self.device.as_mut()
                 {
                     if self.loud_mode {
+                        // Automatically enable SmartVolume if it's off
+                        if !self.smart_volume.enabled {
+                            self.smart_volume.enabled = true;
+                            let _ =
+                                device.enable(SoundFeature::SmartVolume).ok();
+                        }
                         // Disable night mode when enabling loud mode
                         if self.night_mode {
                             self.night_mode = false;
-                            let _ =
-                                device.disable(SoundFeature::NightMode).ok();
                         }
                         let _ = device.enable(SoundFeature::LoudMode).ok();
                     } else {
@@ -345,24 +361,24 @@ impl BlasterApp {
                 );
                 if ui.button("💾 Save Preset").clicked() {
                     if let Some(device) = &self.device {
-                        if !self.save_preset_name.trim().is_empty() {
+                        if self.save_preset_name.trim().is_empty() {
+                            self.preset_error =
+                                Some("Preset name cannot be empty".to_string());
+                        } else {
                             match crate::save_preset(
                                 device,
                                 self.save_preset_name.clone(),
                             ) {
-                                Ok(_) => {
+                                Ok(()) => {
                                     self.save_preset_name.clear();
                                     self.refresh_presets();
                                     self.preset_error = None;
                                 }
                                 Err(e) => {
                                     self.preset_error =
-                                        Some(format!("Failed to save: {}", e));
+                                        Some(format!("Failed to save: {e}"));
                                 }
                             }
-                        } else {
-                            self.preset_error =
-                                Some("Preset name cannot be empty".to_string());
                         }
                     } else {
                         self.preset_error =
@@ -378,7 +394,13 @@ impl BlasterApp {
                 ui.add_space(4.0);
 
                 // Load preset dropdown
-                if !self.presets.is_empty() {
+                if self.presets.is_empty() {
+                    ui.label(
+                        egui::RichText::new("No presets saved")
+                            .small()
+                            .color(egui::Color32::GRAY),
+                    );
+                } else {
                     let preset_names: Vec<String> =
                         self.presets.iter().map(|p| p.name.clone()).collect();
 
@@ -420,15 +442,14 @@ impl BlasterApp {
                             if let Some(device) = self.device.as_mut() {
                                 if let Some(preset) = self.presets.get(idx) {
                                     match crate::load_preset(device, preset) {
-                                        Ok(_) => {
+                                        Ok(()) => {
                                             // Sync UI state with device state
                                             self.sync_ui_from_device();
                                             self.preset_error = None;
                                         }
                                         Err(e) => {
                                             self.preset_error = Some(format!(
-                                                "Failed to load: {}",
-                                                e
+                                                "Failed to load: {e}"
                                             ));
                                         }
                                     }
@@ -444,26 +465,18 @@ impl BlasterApp {
                             && let Some(preset) = self.presets.get(idx)
                         {
                             match crate::delete_preset(preset) {
-                                Ok(_) => {
+                                Ok(()) => {
                                     self.refresh_presets();
                                     self.selected_preset = None;
                                     self.preset_error = None;
                                 }
                                 Err(e) => {
-                                    self.preset_error = Some(format!(
-                                        "Failed to delete: {}",
-                                        e
-                                    ));
+                                    self.preset_error =
+                                        Some(format!("Failed to delete: {e}"));
                                 }
                             }
                         }
                     });
-                } else {
-                    ui.label(
-                        egui::RichText::new("No presets saved")
-                            .small()
-                            .color(egui::Color32::GRAY),
-                    );
                 }
 
                 // Refresh button
@@ -497,30 +510,28 @@ impl BlasterApp {
                                         match crate::load_preset(
                                             device, &preset,
                                         ) {
-                                            Ok(_) => {
+                                            Ok(()) => {
                                                 self.sync_ui_from_device();
                                                 self.preset_error = None;
                                             }
                                             Err(e) => {
                                                 self.preset_error =
                                                     Some(format!(
-                                                        "Failed to load: {}",
-                                                        e
+                                                        "Failed to load: {e}"
                                                     ));
                                             }
                                         }
                                     }
                                     Err(e) => {
                                         self.preset_error = Some(format!(
-                                            "Invalid preset file: {}",
-                                            e
+                                            "Invalid preset file: {e}"
                                         ));
                                     }
                                 }
                             }
                             Err(e) => {
                                 self.preset_error =
-                                    Some(format!("Failed to read file: {}", e));
+                                    Some(format!("Failed to read file: {e}"));
                             }
                         }
                     }
@@ -544,15 +555,49 @@ impl BlasterApp {
 
         ui.add_enabled_ui(self.eq_enabled, |ui| {
             ui.horizontal(|ui| {
+                // Pre-amp control
+                ui.vertical(|ui| {
+                    // Compact dB value input (float display for precise control)
+                    let input = ui.add(
+                        egui::DragValue::new(&mut self.pre_amp)
+                            .range(-12.0..=12.0)
+                            .speed(0.1)
+                            .fixed_decimals(1)
+                            .custom_formatter(|v, _| format!("{v:+.1}")),
+                    );
+
+                    // Vertical slider
+                    let slider = ui.add(
+                        egui::Slider::new(&mut self.pre_amp, -12.0..=12.0)
+                            .vertical()
+                            .show_value(false)
+                            .clamping(egui::SliderClamping::Always),
+                    );
+
+                    if input.changed() || slider.changed() {
+                        if let Some(device) = self.device.as_mut() {
+                            let _ = device.set_pre_amp_db(self.pre_amp).ok();
+                        }
+                    }
+
+                    // Label
+                    ui.label(
+                        egui::RichText::new("Pre")
+                            .small()
+                            .color(egui::Color32::GRAY),
+                    );
+                });
+
+                // EQ bands
                 for (i, label) in EQ_LABELS.iter().enumerate() {
                     ui.vertical(|ui| {
-                        // Compact dB value input (no suffix, integer display)
+                        // Compact dB value input (float display for precise control)
                         let input = ui.add(
                             egui::DragValue::new(&mut self.eq_bands[i])
                                 .range(-12.0..=12.0)
                                 .speed(0.1)
-                                .fixed_decimals(0)
-                                .custom_formatter(|v, _| format!("{:+.0}", v)),
+                                .fixed_decimals(1)
+                                .custom_formatter(|v, _| format!("{v:+.1}")),
                         );
 
                         // Vertical slider
@@ -609,7 +654,7 @@ impl BlasterApp {
                 ui.separator();
 
                 // Window size info (logical pixels)
-                let viewport = ctx.input(|i| i.viewport_rect());
+                let viewport = ctx.input(eframe::egui::InputState::viewport_rect);
                 let logical_w = viewport.width();
                 let logical_h = viewport.height();
 
@@ -618,27 +663,23 @@ impl BlasterApp {
                 let physical_h = logical_h * self.ui_scale;
 
                 ui.label(format!(
-                    "Window: {:.0} × {:.0} logical px",
-                    logical_w, logical_h
+                    "Window: {logical_w:.0} × {logical_h:.0} logical px"
                 ));
                 ui.label(format!(
-                    "Window: {:.0} × {:.0} physical px",
-                    physical_w, physical_h
+                    "Window: {physical_w:.0} × {physical_h:.0} physical px"
                 ));
 
                 ui.add_space(4.0);
                 ui.label(
                     egui::RichText::new(format!(
-                        ".with_inner_size([{:.0}, {:.0}])",
-                        physical_w, physical_h
+                        ".with_inner_size([{physical_w:.0}, {physical_h:.0}])"
                     ))
                     .monospace()
                     .small(),
                 );
                 ui.label(
                     egui::RichText::new(format!(
-                        ".with_min_inner_size([{:.0}, {:.0}])",
-                        physical_w, physical_h
+                        ".with_min_inner_size([{physical_w:.0}, {physical_h:.0}])"
                     ))
                     .monospace()
                     .small(),
