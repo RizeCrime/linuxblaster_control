@@ -1,5 +1,5 @@
 {
-  description = "Sound Blaster X G6 Control for Linux - A native GUI application to control the Creative Sound Blaster X G6";
+  description = "Sound Blaster X G7 Control for Linux - A native GUI application to control the Creative Sound Blaster X G6";
 
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1"; # unstable Nixpkgs
@@ -120,11 +120,22 @@
         {
           options.hardware.soundblaster-g6 = {
             enable = mkEnableOption "Sound Blaster X G6 support";
+            commandName = mkOption {
+              type = types.str;
+              default = "linuxblaster";
+              description = "The command name to make available in the system path.";
+            };
           };
 
           config = mkIf cfg.enable {
             # Install the control application
-            environment.systemPackages = [ self.packages.${pkgs.system}.blaster-x-g6-control ];
+            environment.systemPackages = [ 
+              self.packages.${pkgs.system}.blaster-x-g6-control
+              (pkgs.runCommand "linuxblaster-symlink" {} ''
+                mkdir -p $out/bin
+                ln -s ${self.packages.${pkgs.system}.blaster-x-g6-control}/bin/blaster_x_g6_control $out/bin/${cfg.commandName}
+              '')
+            ];
 
             # Add udev rules for device access
             services.udev.extraRules = ''

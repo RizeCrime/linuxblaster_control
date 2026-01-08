@@ -1,16 +1,17 @@
 use blaster_x_g6_control::BlasterXG6;
-use blaster_x_g6_control::ui::BlasterApp;
 use eframe::egui;
+use tracing::Level;
 
 fn main() -> eframe::Result<()> {
-    let device = BlasterXG6::init().ok();
+    tracing_subscriber::fmt()
+        .with_max_level(Level::DEBUG)
+        .init();
 
-    // Note: sizes are in physical pixels, UI scale (1.5x) is applied after
+    let device = BlasterXG6::init().expect("Failed to initialize device");
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([750.0, 750.0]) // 500*1.5, 500*1.5
-            .with_min_inner_size([750.0, 750.0])
-            .with_resizable(true),
+        viewport: egui::ViewportBuilder::default().with_resizable(true),
+        // .with_inner_size()
         ..Default::default()
     };
 
@@ -19,7 +20,15 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| {
             cc.egui_ctx.set_visuals(egui::Visuals::dark());
-            Ok(Box::new(BlasterApp::new(device)))
+            cc.egui_ctx.set_pixels_per_point(1.5);
+
+            #[cfg(debug_assertions)]
+            {
+                cc.egui_ctx.debug_painter();
+                cc.egui_ctx.set_debug_on_hover(true);
+            }
+
+            Ok(Box::new(device))
         }),
     )
 }
