@@ -105,7 +105,7 @@
             env = {
               # Required by rust-analyzer
               RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
-              LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.udev pkgs.wayland pkgs.libxkbcommon pkgs.libGL pkgs.libglvnd ]}";
+              LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.udev pkgs.wayland pkgs.libxkbcommon pkgs.libGL pkgs.libglvnd pkgs.openssl ]}";
             };
           };
         }

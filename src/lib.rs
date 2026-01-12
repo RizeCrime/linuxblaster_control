@@ -14,8 +14,6 @@ use tracing::{debug, warn};
 // #[cfg(test)]
 // mod tests;
 
-mod app;
-
 pub const VENDOR_ID: u16 = 0x041e;
 pub const PRODUCT_ID: u16 = 0x3256;
 pub const INTERFACE: i32 = 4;
@@ -99,67 +97,67 @@ pub const FEATURES: &[Feature] = &[
         name: "EQ Pre-Amp",
         id: Format::SBX(0x0a),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 31Hz",
         id: Format::SBX(0x0b),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 62Hz",
         id: Format::SBX(0x0c),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 125Hz",
         id: Format::SBX(0x0d),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 250Hz",
         id: Format::SBX(0x0e),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 500Hz",
         id: Format::SBX(0x0f),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 1kHz",
         id: Format::SBX(0x10),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 2kHz",
         id: Format::SBX(0x11),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 4kHz",
         id: Format::SBX(0x12),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 8kHz",
         id: Format::SBX(0x13),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "EQ 16kHz",
         id: Format::SBX(0x14),
         value: FeatureType::Slider(0.0),
-        dependencies: Some(&["SBX", "EQ"]),
+        dependencies: Some(&["SBX", "Equalizer"]),
     },
     Feature {
         name: "Bass",
@@ -265,7 +263,7 @@ pub struct Feature {
 pub struct BlasterXG6 {
     pub device: DeviceInfo,
     pub connection: HidDevice,
-    features: Vec<Feature>,
+    pub features: Vec<Feature>,
 }
 
 impl BlasterXG6 {
@@ -281,6 +279,39 @@ impl BlasterXG6 {
             connection,
             features: FEATURES.to_vec(),
         })
+    }
+
+    /// Resets all features to their default state (Sliders: 0, Toggles: Off)
+    pub fn reset(&mut self) -> Result<(), Box<dyn Error>> {
+        // First set all sliders to 0
+        // We collect the names first to avoid borrowing issues with self.features
+        let slider_names: Vec<String> = self
+            .features
+            .iter()
+            .filter(|f| matches!(f.value, FeatureType::Slider(_)))
+            .map(|f| f.name.to_string())
+            .collect();
+
+        for name in slider_names {
+            // We use 0.0 for all sliders, including EQ bands (0dB)
+            // EQ sliders are 0x0A-0x14, which use raw values. 0.0 is 0dB (flat).
+            // Other sliders use 0-100 range, so 0.0 is 0%.
+            self.set_slider(Box::leak(name.into_boxed_str()), 0.0)?;
+        }
+
+        // Then set all toggles to Off
+        let toggle_names: Vec<String> = self
+            .features
+            .iter()
+            .filter(|f| matches!(f.value, FeatureType::Toggle(_)))
+            .map(|f| f.name.to_string())
+            .collect();
+
+        for name in toggle_names {
+            self.set_feature(name, Some(false))?;
+        }
+
+        Ok(())
     }
 
     pub fn find_device() -> Result<DeviceInfo, Box<dyn Error>> {
@@ -335,7 +366,7 @@ impl BlasterXG6 {
     /// ### Returns a Tuple of
     /// - The Feature
     /// - The dependencies of the Feature as an array of &str
-    fn get_feature(
+    pub fn get_feature(
         &self,
         feature: impl Into<String> + Clone,
     ) -> Result<(&Feature, Option<&[&'static str]>), Box<dyn Error>> {
@@ -383,7 +414,8 @@ impl BlasterXG6 {
                 dependencies.map(|d| d.to_vec()),
             )
         };
-        debug!(feature_value = ?f_value, "Resolved feature entry");
+        debug!(feature_id = ?f_id, "Resolved feature ID");
+        debug!(feature_value = ?f_value, "Resolved feature value");
         debug!(dependencies = ?dependencies, "Feature dependencies");
 
         if !matches!(f_value, FeatureType::Toggle(_)) {
@@ -434,14 +466,15 @@ impl BlasterXG6 {
         }
 
         let value_byte = if final_value { 100 } else { 0 };
-        let payload_array = create_payload(f_id, value_byte as f32);
+        let payload = create_payload(f_id, value_byte as f32);
         debug!(
             feature = %feature.clone().into(),
             value_byte,
-            payload_head = %format_hex(&payload_array[..10]),
+            payload_head = %format_hex(&payload.data[..12]),
             "Prepared payload"
         );
-        self.connection.write(&payload_array)?;
+        self.connection.write(&payload.data)?;
+        self.connection.write(&payload.commit)?;
 
         debug!(feature = %feature.clone().into(), final_value, "Updating feature");
         self.update_feature_value(
@@ -470,12 +503,6 @@ impl BlasterXG6 {
             )
         };
 
-        if let Some(dependencies) = dependencies {
-            dependencies.iter().try_for_each(|dependency| {
-                self.set_feature(*dependency, Some(true))
-            })?;
-        }
-
         if !matches!(f_value, FeatureType::Slider(_)) {
             return Err(Box::new(std::io::Error::new(
                 ErrorKind::InvalidInput,
@@ -483,8 +510,20 @@ impl BlasterXG6 {
             )));
         }
 
-        let payload: &[u8] = &create_payload(f_id, value);
-        self.connection.write(payload)?;
+        if let Some(dependencies) = dependencies {
+            dependencies.iter().try_for_each(|dependency| {
+                if let Ok((f, _)) = self.get_feature(*dependency)
+                    && let Some(false) = f.value.as_bool()
+                {
+                    self.set_feature(*dependency, Some(true))?;
+                }
+                Ok::<(), Box<dyn Error>>(())
+            })?;
+        }
+
+        let payload = create_payload(f_id, value);
+        self.connection.write(&payload.data)?;
+        self.connection.write(&payload.commit)?;
 
         self.update_feature_value(feature, FeatureType::Slider(value))?;
 
@@ -514,76 +553,92 @@ impl BlasterXG6 {
     }
 }
 
-fn create_payload(id: Format, value: f32) -> [u8; 64] {
+pub struct Payload {
+    data: [u8; 65],
+    commit: [u8; 65],
+}
+
+fn create_payload(id: Format, value: f32) -> Payload {
     debug!(?id, value, "create_payload called");
-    let value_bytes = value.to_le_bytes();
+    // 65 bytes: 1 byte Report ID + 64 bytes data
+    let mut data = [0u8; 65];
+    let mut commit = [0u8; 65];
 
-    let mut payload = [0u8; 64];
-    let mut commit = [0u8; 64];
-
-    payload[0] = 0x5a; // Magic byte 
-    commit[0] = 0x5a; // Magic byte 
+    data[0] = 0x00; // HID Report ID
+    data[1] = 0x5a; // Magic byte
+    commit[0] = 0x00; // HID Report ID
+    commit[1] = 0x5a; // Magic byte
 
     match id {
         Format::Global(id) => {
-            payload[1] = 0x26;
-            payload[2] = 0x05;
-            payload[3] = 0x07;
-            payload[4] = id;
-            payload[5] = 0x00;
-            payload[6..10].copy_from_slice(&value_bytes);
+            data[2] = 0x26;
+            data[3] = 0x05;
+            data[4] = 0x07;
+            data[5] = id;
+            data[6] = 0x00;
+            data[7] = if value > 0.0 { 0x01 } else { 0x00 };
 
-            commit[1] = 0x26;
-            commit[2] = 0x03;
-            commit[3] = 0x08;
-            commit[4] = 0xff;
+            commit[2] = 0x26;
+            commit[3] = 0x03;
+            commit[4] = 0x08;
             commit[5] = 0xff;
+            commit[6] = 0xff;
         }
         Format::SBX(id) => {
-            payload[1] = 0x12;
-            payload[2] = 0x07;
-            payload[3] = 0x01;
-            payload[4] = 0x96;
-            payload[5] = id;
-            payload[6..10].copy_from_slice(&value_bytes);
+            // EQ Sliders (0x0A - 0x14) use raw values.
+            // All other SBX features (Toggles, normalized sliders) need / 100.0 normalization
+            // because the UI sends 0-100 range.
+            let effective_value = if (0x0a..=0x14).contains(&id) {
+                value
+            } else {
+                value / 100.0
+            };
+            let value_bytes = effective_value.to_le_bytes();
 
-            commit[1] = 0x11;
-            commit[2] = 0x03;
-            commit[3] = 0x01;
-            commit[4] = 0x96;
-            commit[5] = id;
-            commit[6] = 0x00;
+            data[2] = 0x12;
+            data[3] = 0x07;
+            data[4] = 0x01;
+            data[5] = 0x96;
+            data[6] = id;
+            data[7..11].copy_from_slice(&value_bytes);
+
+            commit[2] = 0x11;
+            commit[3] = 0x03;
+            commit[4] = 0x01;
+            commit[5] = 0x96;
+            commit[6] = id;
             commit[7] = 0x00;
             commit[8] = 0x00;
             commit[9] = 0x00;
+            commit[10] = 0x00;
         }
         Format::RGB(id) => {
             // RGB uses 0x3a command family
             // Pattern: [0x5a] [0x3a] [subcmd] [params...]
             // For basic toggle: [0x5a] [0x3a] [0x02] [0x06] [state] [0x00] ...
             // state: 0x00 = OFF, 0x01 = ON
-            payload[1] = 0x3a; // Command family
-            payload[2] = 0x02; // Sub-command
-            payload[3] = 0x06; // Parameter
-            payload[4] = if value > 0.0 { 0x01 } else { 0x00 }; // State: ON if value > 0, OFF if 0
-            payload[5] = 0x00;
+            data[2] = 0x3a; // Command family
+            data[3] = 0x02; // Sub-command
+            data[4] = 0x06; // Parameter
+            data[5] = if value > 0.0 { 0x01 } else { 0x00 }; // State: ON if value > 0, OFF if 0
+            data[6] = 0x00;
 
             // RGB doesn't use a commit pattern like Format 1/2, but populate commit array anyway
             // (Note: RGB ON actually requires 3 commands total, but this function only returns one)
-            commit[1] = 0x3a;
-            commit[2] = 0x02;
-            commit[3] = 0x06;
-            commit[4] = if value > 0.0 { 0x01 } else { 0x00 };
-            commit[5] = 0x00;
+            commit[2] = 0x3a;
+            commit[3] = 0x02;
+            commit[4] = 0x06;
+            commit[5] = if value > 0.0 { 0x01 } else { 0x00 };
+            commit[6] = 0x00;
         }
     }
 
     debug!(
-        payload_head = %format_hex(&payload[..10]),
-        commit_head = %format_hex(&commit[..10]),
+        payload_head = %format_hex(&data[..12]),
+        commit_head = %format_hex(&commit[..12]),
         "create_payload completed"
     );
-    payload
+    Payload { data, commit }
 }
 
 /// Converts a 0-100 Value to 4 little-endian float bytes (0.0 - 1.0)

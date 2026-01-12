@@ -6,8 +6,13 @@ edition = "2024"
 [dependencies]
 eframe = "0.33.3"
 hidapi = "2.6.4"
-rfd = "0.16.0"
+phf = "0.13.1"
 serde = "1.0.228"
 serde_json = "1.0.148"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
+
+[build-dependencies]
+phf_codegen = "0.13.1"
+walkdir = "2.5.0"
+

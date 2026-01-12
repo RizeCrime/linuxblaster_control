@@ -1,6 +1,13 @@
+#![allow(unused)]
+
+use std::sync::LazyLock;
+
 use blaster_x_g6_control::BlasterXG6;
-use eframe::egui;
+use eframe::egui::{self, ahash::HashMap, mutex::Mutex};
 use tracing::Level;
+
+mod app;
+use app::BlasterApp;
 
 fn main() -> eframe::Result<()> {
     tracing_subscriber::fmt()
@@ -8,6 +15,7 @@ fn main() -> eframe::Result<()> {
         .init();
 
     let device = BlasterXG6::init().expect("Failed to initialize device");
+    let app = BlasterApp(device);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_resizable(true),
@@ -25,10 +33,29 @@ fn main() -> eframe::Result<()> {
             #[cfg(debug_assertions)]
             {
                 cc.egui_ctx.debug_painter();
-                cc.egui_ctx.set_debug_on_hover(true);
+                cc.egui_ctx.set_debug_on_hover(false);
             }
 
-            Ok(Box::new(device))
+            Ok(Box::new(app))
         }),
     )
 }
+
+/// Results from "<headphone_name> FixedBandEQ.txt"
+/// mapped to ten bands (31Hz, 62Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz)
+#[derive(Debug, Clone)]
+pub struct HeadphoneResult {
+    pub name: &'static str,
+    pub preamp: f32,
+    pub ten_band_eq: [f32; 10],
+}
+
+struct AutoEqDb {
+    // HashMap
+    // Key: Name (DT 990 Pro (250 Ohm))
+    // Value: Vec<HeadphoneResult>
+    results:
+        Option<&'static phf::Map<&'static str, &'static [HeadphoneResult]>>,
+}
+
+include!(concat!(env!("OUT_DIR"), "/autoeq_db.rs"));
