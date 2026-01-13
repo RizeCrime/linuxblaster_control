@@ -23,6 +23,8 @@ use crate::{AUTOEQ_DB, AutoEqDb, HeadphoneResult};
 #[path = "macros.rs"]
 mod macros;
 
+const ISO_BANDS: [f64; 10] = [31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0];
+
 static UI_SELECTED: LazyLock<Mutex<&'static str>> =
     LazyLock::new(|| Mutex::new("Equalizer"));
 static AUTOEQ_MODAL: LazyLock<Mutex<bool>> =
@@ -178,11 +180,6 @@ fn eq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
                     ));
 
                     if drag_value.changed() || slider.changed() {
-                        // let _ = blaster.set_slider(band.name, *value);
-                        *CACHE_DIRTY.lock().unwrap() = true;
-                    }
-
-                    if drag_value.drag_stopped() || slider.drag_stopped() {
                         let _ = blaster.set_slider(band.name, *value);
                         *CACHE_DIRTY.lock().unwrap() = true;
                     }
@@ -324,9 +321,10 @@ fn autoeq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
                             ui.horizontal(|ui| {
                                 // metadata
                                 ui.vertical(|ui| {
+                                    ui.set_width(180.0);
                                     ui.label(
                                         RichText::new(format!(
-                                            "Tester: {}",
+                                            "By: {}",
                                             result.tester
                                         ))
                                         .color(Color32::GRAY),
@@ -363,11 +361,15 @@ fn autoeq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
                                         .show_grid(true)
                                         .include_y(-12.0)
                                         .include_y(12.0)
-                                        .include_x(00.0_f64.log10())
+                                        .include_x(20.0_f64.log10())
                                         .include_x(16000.0_f64.log10())
                                         .allow_scroll(false)
                                         .allow_zoom(false)
-                                        .allow_drag(false);
+                                        .allow_drag(false)
+                                        .allow_axis_zoom_drag(false)
+                                        .allow_boxed_zoom(false)
+                                        .height(80.0)
+                                        .view_aspect(3.0);
 
                                 plot.show(ui, |plot_ui| {
                                     let points: PlotPoints = (0..=500).map(|i| {
@@ -375,9 +377,11 @@ fn autoeq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
                                         let f = 20.0 * (20000.0 / 20.0_f64).powf(t);
                                         
                                         let mut total_y = 0.0; 
-                                        for (freq, gain) in result.ten_band_eq.iter().enumerate() {
-                                            if gain.abs() > 0.01 {
-                                                total_y += calculate_peaking_eq_response(f, freq as f64, *gain as f64, 1.6);
+                                        for (idx, gain) in result.ten_band_eq.iter().enumerate() {
+                                            if let Some(&center_freq) = ISO_BANDS.get(idx) {
+                                                if gain.abs() > 0.01 {
+                                                    total_y += calculate_peaking_eq_response(f, center_freq as f64, *gain as f64, 1.41);
+                                                }
                                             }
                                         }
 
@@ -386,35 +390,28 @@ fn autoeq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
 
                                     plot_ui.line(Line::new(format!("eq_curve_{}", name), points).width(2.0));
                                 });
+
+                                let apply_button = ui.button(RichText::new("Apply Profile"));
+                                if apply_button.clicked() {
+                                    for (idx, gain) in result.ten_band_eq.iter().enumerate() {
+                                        if let Some(&center_freq) = ISO_BANDS.get(idx) {
+                                        if gain.abs() > 0.01 {
+                                            let mut feature_name;
+                                            if center_freq < 1000.0 {
+                                                feature_name = format!("EQ {}Hz", center_freq);
+                                            } else {
+                                                feature_name = format!("EQ {}kHz", center_freq / 1000.0);
+                                            }
+                                            let _ = blaster.set_slider(&feature_name, *gain as f32);
+                                        }
+                                        }
+                                    }
+                                    let _ = blaster.set_slider("EQ Pre-Amp", result.preamp as f32);
+                                    *CACHE_DIRTY.lock().unwrap() = true;
+                                }
                             });
                         }
                     });
-
-                    // Grid::new(format!("result_grid_{}", name))
-                    //     .striped(true)
-                    //     .show(ui, |ui| {
-                    //         ui.label("Tester");
-                    //         ui.label("Variant");
-                    //         ui.label("Test Device");
-                    //         ui.end_row();
-                    //         for result in results.iter() {
-                    //             ui.label(
-                    //                 RichText::new(result.tester)
-                    //                     .color(Color32::LIGHT_GRAY),
-                    //             );
-                    //             ui.label(
-                    //                 RichText::new(result.variant.unwrap_or(""))
-                    //                     .color(Color32::LIGHT_GRAY),
-                    //             );
-                    //             ui.label(
-                    //                 RichText::new(
-                    //                     result.test_device.unwrap_or(""),
-                    //                 )
-                    //                 .color(Color32::LIGHT_GRAY),
-                    //             );
-                    //             ui.end_row();
-                    //         }
-                    //     });
 
                     ui.separator();
                 }

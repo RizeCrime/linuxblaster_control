@@ -302,7 +302,7 @@ impl BlasterXG6 {
         for name in slider_names {
             // EQ sliders are 0x0A-0x14, which use raw values. 0.0 is 0dB (flat).
             // Other sliders use 0-100 range, so 0.0 is 0%.
-            self.set_slider(Box::leak(name.into_boxed_str()), 0.0)?;
+            self.set_slider(&name, 0.0)?;
         }
 
         // Toggles
@@ -531,7 +531,7 @@ impl BlasterXG6 {
     /// Also sets any required dependencies to On
     pub fn set_slider(
         &mut self,
-        feature: &'static str,
+        feature: &str,
         value: f32,
     ) -> Result<(), Box<dyn Error>> {
         let (f_id, f_value, dependencies) = {
