@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 eframe = "0.33.3"
+egui_plot = "0.34.0"
+fuzzy-matcher = "0.3.7"
 hidapi = "2.6.4"
 phf = "0.13.1"
 serde = "1.0.228"

@@ -5,19 +5,32 @@ use eframe::egui::{
     self, Button, Color32, Rect, RichText, Stroke, Vec2, accesskit::Size,
 };
 use eframe::egui::{
-    Align, DragValue, Grid, Layout, Margin, Slider, Widget, widgets,
+    Align, CollapsingHeader, ComboBox, DragValue, Grid, Layout, Margin, Popup,
+    PopupCloseBehavior, ScrollArea, Slider, Widget, Window, widgets,
 };
+use egui_plot::{Line, Plot, PlotPoints, log_grid_spacer};
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::{LazyLock, Mutex};
 use tracing::debug;
+
+use crate::{AUTOEQ_DB, AutoEqDb, HeadphoneResult};
 
 #[macro_use]
 #[path = "macros.rs"]
 mod macros;
 
 static UI_SELECTED: LazyLock<Mutex<&'static str>> =
-    LazyLock::new(|| Mutex::new(""));
+    LazyLock::new(|| Mutex::new("Equalizer"));
+static AUTOEQ_MODAL: LazyLock<Mutex<bool>> =
+    LazyLock::new(|| Mutex::new(false));
+static SEARCH_QUERY: LazyLock<Mutex<String>> =
+    LazyLock::new(|| Mutex::new(String::new()));
+static SEARCH_RESULTS: LazyLock<Mutex<Vec<&'static str>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 static CACHE_DIRTY: LazyLock<Mutex<bool>> = LazyLock::new(|| Mutex::new(false));
 
@@ -79,7 +92,11 @@ impl eframe::App for BlasterApp {
                     sbx_pane(&mut self.0, ui);
                 }
                 "Equalizer" => {
-                    eq_pane(&mut self.0, ui);
+                    if *AUTOEQ_MODAL.lock().unwrap() {
+                        autoeq_pane(&mut self.0, ui);
+                    } else {
+                        eq_pane(&mut self.0, ui);
+                    }
                 }
                 "Scout Mode" => {
                     scout_mode_pane(ui);
@@ -100,9 +117,6 @@ fn sbx_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
     });
 }
 
-static SEARCH_QUERY: LazyLock<Mutex<String>> =
-    LazyLock::new(|| Mutex::new(String::new()));
-
 fn eq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
     let mut binding = blaster.features.clone();
     let eq_bands: Vec<&mut Feature> = binding
@@ -111,7 +125,12 @@ fn eq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
         .collect();
 
     ui.vertical_centered_justified(|ui| {
-        ui.heading(RichText::new("AutoEq; TODO"));
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("AutoEq: ").color(Color32::GRAY));
+            if ui.button(RichText::new("Select Profile")).clicked() {
+                *AUTOEQ_MODAL.lock().unwrap() = true;
+            }
+        });
 
         ui.separator();
 
@@ -201,11 +220,19 @@ fn scout_mode_pane(ui: &mut egui::Ui) {
                             ui.group(|ui| {
                                 ui.label(RichText::new(*name).strong());
                                 for (i, res) in results.iter().enumerate() {
-                                    ui.label(format!("Variant: {}", res.name));
+                                    ui.label(format!(
+                                        "Variant: {}",
+                                        res.variant.unwrap_or("")
+                                    ));
                                     ui.label(format!(
                                         "Preamp: {} dB",
                                         res.preamp
                                     ));
+                                    ui.label(format!(
+                                        "Test Device: {}",
+                                        res.test_device.unwrap_or("Unknown")
+                                    ));
+                                    ui.label(format!("Tester: {}", res.tester));
                                     ui.push_id(i, |ui| {
                                         ui.collapsing("EQ Bands", |ui| {
                                             for (i, gain) in res
@@ -229,6 +256,178 @@ fn scout_mode_pane(ui: &mut egui::Ui) {
             });
         }
     });
+}
+
+fn autoeq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
+    let mut search = SEARCH_QUERY.lock().unwrap();
+    let db: AutoEqDb = AutoEqDb {
+        results: Some(&AUTOEQ_DB),
+    };
+
+    ui.vertical_centered_justified(|ui| {
+        // Header
+        ui.horizontal(|ui| {
+            if ui.button(RichText::new("Back")).clicked() {
+                *AUTOEQ_MODAL.lock().unwrap() = false;
+            }
+            ui.heading(
+                RichText::new("Select AutoEq Profile").color(Color32::GRAY),
+            );
+        });
+        ui.separator();
+
+        // Search Bar
+        ui.horizontal(|ui| {
+            ui.label("Search Headphones:");
+
+            let response = ui.text_edit_singleline(&mut *search);
+            if response.changed() {
+                let matcher = SkimMatcherV2::default();
+                let mut results: Vec<(i64, &'static str)> = Vec::new();
+
+                if let Some(map) = db.results {
+                    for key in map.keys() {
+                        if let Some(score) = matcher.fuzzy_match(key, &search) {
+                            results.push((score, *key));
+                        }
+                    }
+                }
+
+                results.sort_unstable_by_key(|k| Reverse(k.0));
+
+                *SEARCH_RESULTS.lock().unwrap() =
+                    results.into_iter().take(50).map(|(_, key)| key).collect();
+            }
+        });
+        ui.separator();
+
+        // Search Results
+
+        if search.is_empty() {
+            ui.label("Enter search term to see results");
+            return;
+        }
+
+        let results_cache = SEARCH_RESULTS.lock().unwrap();
+
+        ScrollArea::vertical().show(ui, |ui| {
+            if results_cache.is_empty() {
+                ui.label("No results found");
+                return;
+            }
+
+            for name in results_cache.iter() {
+                if let Some(results) = db.results.and_then(|map| map.get(name))
+                {
+                    ui.collapsing(RichText::new(*name).strong(), |ui| {
+                        for result in results.iter() {
+                            ui.horizontal(|ui| {
+                                // metadata
+                                ui.vertical(|ui| {
+                                    ui.label(
+                                        RichText::new(format!(
+                                            "Tester: {}",
+                                            result.tester
+                                        ))
+                                        .color(Color32::GRAY),
+                                    );
+                                    ui.label(
+                                        RichText::new(format!(
+                                            "Variant: {}",
+                                            result.variant.unwrap_or("")
+                                        ))
+                                        .color(Color32::GRAY),
+                                    );
+                                    ui.label(
+                                        RichText::new(format!(
+                                            "Test Device: {}",
+                                            result.test_device.unwrap_or("")
+                                        ))
+                                        .color(Color32::GRAY),
+                                    );
+                                    // ui.separator();
+                                });
+                                // eq curve
+                                let plot =
+                                    Plot::new(format!("eq_curve_{}_{}_{}", name, result.tester, result.variant.unwrap_or("")))
+                                        .x_grid_spacer(log_grid_spacer(10))
+                                        .x_axis_formatter(|x, _range| {
+                                            let freq = 10.0_f64.powf(x.value);
+                                            if freq >= 1000.0 {
+                                                format!("{} kHz", freq / 1000.0)
+                                            } else {
+                                                format!("{} Hz", freq)
+                                            }
+                                        })
+                                        .y_axis_min_width(40.0)
+                                        .show_grid(true)
+                                        .include_y(-12.0)
+                                        .include_y(12.0)
+                                        .include_x(00.0_f64.log10())
+                                        .include_x(16000.0_f64.log10())
+                                        .allow_scroll(false)
+                                        .allow_zoom(false)
+                                        .allow_drag(false);
+
+                                plot.show(ui, |plot_ui| {
+                                    let points: PlotPoints = (0..=500).map(|i| {
+                                        let t = i as f64 / 500.0; 
+                                        let f = 20.0 * (20000.0 / 20.0_f64).powf(t);
+                                        
+                                        let mut total_y = 0.0; 
+                                        for (freq, gain) in result.ten_band_eq.iter().enumerate() {
+                                            if gain.abs() > 0.01 {
+                                                total_y += calculate_peaking_eq_response(f, freq as f64, *gain as f64, 1.6);
+                                            }
+                                        }
+
+                                        [f.log10(), total_y]
+                                    }).collect();
+
+                                    plot_ui.line(Line::new(format!("eq_curve_{}", name), points).width(2.0));
+                                });
+                            });
+                        }
+                    });
+
+                    // Grid::new(format!("result_grid_{}", name))
+                    //     .striped(true)
+                    //     .show(ui, |ui| {
+                    //         ui.label("Tester");
+                    //         ui.label("Variant");
+                    //         ui.label("Test Device");
+                    //         ui.end_row();
+                    //         for result in results.iter() {
+                    //             ui.label(
+                    //                 RichText::new(result.tester)
+                    //                     .color(Color32::LIGHT_GRAY),
+                    //             );
+                    //             ui.label(
+                    //                 RichText::new(result.variant.unwrap_or(""))
+                    //                     .color(Color32::LIGHT_GRAY),
+                    //             );
+                    //             ui.label(
+                    //                 RichText::new(
+                    //                     result.test_device.unwrap_or(""),
+                    //                 )
+                    //                 .color(Color32::LIGHT_GRAY),
+                    //             );
+                    //             ui.end_row();
+                    //         }
+                    //     });
+
+                    ui.separator();
+                }
+            }
+        });
+    });
+}
+
+fn calculate_peaking_eq_response(freq: f64, center_freq: f64, gain: f64, q: f64) -> f64 {
+    let bandwidth = center_freq / q;
+    let diff = (freq - center_freq).abs();
+    let falloff = 1.0 / (1.0 + (diff / (bandwidth * 0.5)).powf(2.0));
+    gain * falloff
 }
 
 /// Cache for get_feature() results

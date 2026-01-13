@@ -56,10 +56,10 @@ The device uses multiple command formats with hierarchical dependencies:
 
 ### Command Structure
 
-| Byte | 0    | 1-2    | 3-4    | 5          | 6-9         | 10+   |
-| ---- | ---- | ------ | ------ | ---------- | ----------- | ----- |
-| DATA | 0x5a | 0x1207 | 0x0196 | Feature ID | Value Bytes | zeros |
-| COMMIT| 0x5a| 0x1103 | 0x0196 | Feature ID | 0x00000000  | zeros |
+| Byte | 0    | 1    | 2    | 3    | 4    | 5          | 6-9         | 10+   |
+| ---- | ---- | ---- | ---- | ---- | ---- | ---------- | ----------- | ----- |
+| DATA | 0x5a | 0x12 | 0x07 | 0x01 | 0x96 | Feature ID | Value Bytes | zeros |
+| COMMIT| 0x5a| 0x11 | 0x03 | 0x01 | 0x96 | Feature ID | 0x00000000  | zeros |
 
 ### Command Types
 

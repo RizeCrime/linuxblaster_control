@@ -180,6 +180,12 @@ pub enum Format {
     RGB(u8),
 }
 
+impl Display for Format {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(PartialEq, Clone, Debug)]
 pub enum FeatureType {
     Toggle(bool),
@@ -268,14 +274,13 @@ pub struct BlasterXG6 {
 
 impl BlasterXG6 {
     pub fn init() -> Result<Self, Box<dyn Error>> {
-        let device = Self::find_device()?;
-
         let api = HidApi::new()?;
+        let device = Self::find_device(&api)?;
         let connection = device.open_device(&api)?;
         let _ = connection.set_blocking_mode(false);
 
         Ok(Self {
-            device: device.clone(),
+            device,
             connection,
             features: FEATURES.to_vec(),
         })
@@ -283,8 +288,10 @@ impl BlasterXG6 {
 
     /// Resets all features to their default state (Sliders: 0, Toggles: Off)
     pub fn reset(&mut self) -> Result<(), Box<dyn Error>> {
-        // First set all sliders to 0
-        // We collect the names first to avoid borrowing issues with self.features
+        // reset sliders first, in case they can't be changed after toggles are off
+        // don't know if necessary, hard to know with a reverse engineering protocol
+
+        // Sliders
         let slider_names: Vec<String> = self
             .features
             .iter()
@@ -293,13 +300,12 @@ impl BlasterXG6 {
             .collect();
 
         for name in slider_names {
-            // We use 0.0 for all sliders, including EQ bands (0dB)
             // EQ sliders are 0x0A-0x14, which use raw values. 0.0 is 0dB (flat).
             // Other sliders use 0-100 range, so 0.0 is 0%.
             self.set_slider(Box::leak(name.into_boxed_str()), 0.0)?;
         }
 
-        // Then set all toggles to Off
+        // Toggles
         let toggle_names: Vec<String> = self
             .features
             .iter()
@@ -314,13 +320,13 @@ impl BlasterXG6 {
         Ok(())
     }
 
-    pub fn find_device() -> Result<DeviceInfo, Box<dyn Error>> {
-        let api = HidApi::new()?;
-        let device = api
+    pub fn find_device(api: &HidApi) -> Result<DeviceInfo, Box<dyn Error>> {
+        let device: DeviceInfo = api
             .device_list()
             .find(|device| {
                 device.vendor_id() == VENDOR_ID
                     && device.product_id() == PRODUCT_ID
+                    && device.interface_number() == INTERFACE
             })
             .ok_or_else(|| {
                 Box::new(std::io::Error::new(
@@ -329,6 +335,24 @@ impl BlasterXG6 {
                 ))
             })
             .cloned()?;
+
+        debug!("Found device:");
+        debug!("- vendor_id:     0x{:04x}", device.vendor_id());
+        debug!("- product_id:    0x{:04x}", device.product_id());
+        debug!("- interface:     {}", device.interface_number());
+        debug!(
+            "- manufacturer:  {}",
+            device.manufacturer_string().unwrap_or("Unknown")
+        );
+        debug!(
+            "- product:       {}",
+            device.product_string().unwrap_or("Unknown")
+        );
+        debug!(
+            "- serial_number: {}",
+            device.serial_number().unwrap_or("Unknown")
+        );
+
         Ok(device)
     }
 
@@ -374,15 +398,14 @@ impl BlasterXG6 {
             .iter()
             .find(|f| f.name == feature.clone().into())
             .map(|f| {
-                debug!(
-                    feature = %feature.clone().into(),
-                    dependencies = ?f.dependencies,
-                    "Found feature entry"
-                );
+                // debug!("Found feature entry:");
+                // debug!("- feature: {}", feature.clone().into());
+                // debug!("- dependencies: {:?}", f.dependencies);
                 (f, f.dependencies)
             })
             .ok_or_else(|| {
-                debug!(feature = %feature.clone().into(), "Feature not found");
+                debug!("Feature not found:");
+                debug!("- feature: {}", feature.clone().into());
                 Box::<dyn Error>::from(std::io::Error::new(
                     ErrorKind::NotFound,
                     format!("Feature {} not found", feature.clone().into()),
@@ -404,7 +427,9 @@ impl BlasterXG6 {
         feature: impl Into<String> + Clone,
         value: Option<bool>,
     ) -> Result<(), Box<dyn Error>> {
-        debug!(feature = %feature.clone().into(), value = ?value, "Setting feature");
+        debug!("===== set_feature =====");
+        debug!("feature: {}", feature.clone().into());
+        debug!("value:   {:?}", value);
 
         let (f_id, f_value, dependencies) = {
             let (f, dependencies) = self.get_feature(feature.clone())?;
@@ -414,12 +439,13 @@ impl BlasterXG6 {
                 dependencies.map(|d| d.to_vec()),
             )
         };
-        debug!(feature_id = ?f_id, "Resolved feature ID");
-        debug!(feature_value = ?f_value, "Resolved feature value");
-        debug!(dependencies = ?dependencies, "Feature dependencies");
+        debug!("Resolved Feature:");
+        debug!("- id:           {:?}", f_id);
+        debug!("- value:        {:?}", f_value);
+        debug!("- dependencies: {:?}", dependencies);
 
         if !matches!(f_value, FeatureType::Toggle(_)) {
-            debug!(feature = %feature.clone().into(), "Feature is not a toggle");
+            debug!("Feature is not a toggle");
             return Err(Box::new(std::io::Error::new(
                 ErrorKind::InvalidInput,
                 format!("Feature {} is not a toggle", feature.clone().into()),
@@ -437,52 +463,66 @@ impl BlasterXG6 {
                 }
             }
         };
-        debug!(
-            feature = %feature.clone().into(),
-            final_value,
-            "Determined final toggle value"
-        );
+        debug!("Determined final toggle value:");
+        debug!("- feature:    {}", feature.clone().into());
+        debug!("- final_value: {}", final_value);
 
-        // Only set dependencies if we're turning the feature on
+        // Enable dependencies if the feature is being turned on
         if final_value {
             if let Some(dependencies) = dependencies {
-                debug!(feature = %feature.clone().into(), "Setting required dependencies");
+                debug!("Setting required dependencies:");
+                debug!("- dependencies: {:?}", dependencies);
+
                 dependencies.iter().try_for_each(|dependency| {
-                    debug!(dependency = %dependency, "Enabling dependency");
+                    if let Ok((f, _)) = self.get_feature(dependency.to_string())
+                        && f.value.as_bool() == Some(true)
+                    {
+                        debug!("Dependency already enabled: {}", dependency);
+                        return Ok(());
+                    }
+                    debug!("Enabling dependency: {}", dependency);
                     self.set_feature(dependency.to_string(), Some(true))
                 })?;
             }
-        } else {
+        }
+        // Disable dependents if the feature is being turned off
+        else {
             let dependents = self.get_dependents(&feature.clone().into());
+            debug!("Disabling dependents:");
+            debug!("- dependents: {:?}", dependents);
+
             for dependent in dependents {
                 // Only disable if it's a toggle feature
                 if let Ok((f, _)) = self.get_feature(dependent)
                     && matches!(f.value, FeatureType::Toggle(_))
                 {
-                    debug!(dependent = %dependent, "Disabling dependent feature");
-                    self.set_feature(dependent, Some(false))?;
+                    if f.value.as_bool() == Some(false) {
+                        debug!("Dependent already disabled: {}", dependent);
+                        continue;
+                    }
+                    debug!("Disabling dependent feature: {}", dependent);
+                    let _ = self.set_feature(dependent, Some(false));
                 }
             }
         }
 
         let value_byte = if final_value { 100 } else { 0 };
         let payload = create_payload(f_id, value_byte as f32);
-        debug!(
-            feature = %feature.clone().into(),
-            value_byte,
-            payload_head = %format_hex(&payload.data[..12]),
-            "Prepared payload"
-        );
+
+        debug!("Sending payload to device...");
+
         self.connection.write(&payload.data)?;
         self.connection.write(&payload.commit)?;
 
-        debug!(feature = %feature.clone().into(), final_value, "Updating feature");
+        debug!("Payload sent ¯\\_(ツ)_/¯");
+
+        debug!("Updating feature value...");
         self.update_feature_value(
             feature.clone().into().as_str(),
             FeatureType::Toggle(final_value),
         )?;
 
-        debug!(feature = %feature.clone().into(), "Payload sent");
+        debug!("===== set_feature completed =====");
 
         Ok(())
     }
@@ -535,14 +575,26 @@ impl BlasterXG6 {
         feature: impl Into<String> + Clone,
         value: FeatureType,
     ) -> Result<(), Box<dyn Error>> {
+        debug!("===== update_feature_value =====");
+        debug!("feature: {}", feature.clone().into());
+        debug!("value:   {:?}", value);
+
         if let Some(feature_entry) = self
             .features
             .iter_mut()
             .find(|f| f.name == feature.clone().into())
         {
+            debug!(
+                "Updating Feature Value {} -> {:?}",
+                feature.clone().into(),
+                value
+            );
             feature_entry.value = value;
             return Ok(());
         }
+
+        debug!("===== update_feature_value completed =====");
+
         Err(Box::new(std::io::Error::new(
             ErrorKind::NotFound,
             format!(
@@ -559,7 +611,9 @@ pub struct Payload {
 }
 
 fn create_payload(id: Format, value: f32) -> Payload {
-    debug!(?id, value, "create_payload called");
+    debug!("===== create_payload =====");
+    debug!("id:      {:?}", id);
+    debug!("value:   {:?}", value);
     // 65 bytes: 1 byte Report ID + 64 bytes data
     let mut data = [0u8; 65];
     let mut commit = [0u8; 65];
@@ -613,31 +667,25 @@ fn create_payload(id: Format, value: f32) -> Payload {
             commit[10] = 0x00;
         }
         Format::RGB(id) => {
-            // RGB uses 0x3a command family
-            // Pattern: [0x5a] [0x3a] [subcmd] [params...]
-            // For basic toggle: [0x5a] [0x3a] [0x02] [0x06] [state] [0x00] ...
-            // state: 0x00 = OFF, 0x01 = ON
-            data[2] = 0x3a; // Command family
-            data[3] = 0x02; // Sub-command
-            data[4] = 0x06; // Parameter
-            data[5] = if value > 0.0 { 0x01 } else { 0x00 }; // State: ON if value > 0, OFF if 0
-            data[6] = 0x00;
-
-            // RGB doesn't use a commit pattern like Format 1/2, but populate commit array anyway
-            // (Note: RGB ON actually requires 3 commands total, but this function only returns one)
-            commit[2] = 0x3a;
-            commit[3] = 0x02;
-            commit[4] = 0x06;
-            commit[5] = if value > 0.0 { 0x01 } else { 0x00 };
-            commit[6] = 0x00;
+            println!("RGB payload not implemented yet :)");
         }
     }
 
+    // debug!(
+    //     payload_head = %format_hex(&data[..12]),
+    //     commit_head = %format_hex(&commit[..12]),
+    //     "create_payload completed"
+    // );
+    debug!("create_payload completed: {}", id);
+    debug!("- data:   {} : {}", &data.len(), format_hex(&data[..12]));
     debug!(
-        payload_head = %format_hex(&data[..12]),
-        commit_head = %format_hex(&commit[..12]),
-        "create_payload completed"
+        "- commit: {} : {}",
+        &commit.len(),
+        format_hex(&commit[..12])
     );
+
+    debug!("===== create_payload completed =====");
+
     Payload { data, commit }
 }
 

@@ -86,6 +86,7 @@
               cargo-watch
               rust-analyzer
               bacon
+              evcxr 
 
               # wayland support
               wayland

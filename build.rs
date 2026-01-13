@@ -7,7 +7,9 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 
 struct HeadphoneResult {
-    name: String,
+    tester: String,
+    variant: Option<String>,
+    test_device: Option<String>,
     preamp: f32,
     ten_band_eq: [f32; 10],
 }
@@ -77,25 +79,73 @@ fn main() {
     let mut entries: HashMap<String, Vec<HeadphoneResult>> = HashMap::new();
 
     for line in index.lines() {
+        // example line:
+        // - [1MORE Aero (ANC Off)](./HypetheSonics/GRAS%20RA0045%20in-ear/1MORE%20Aero%20(ANC%20Off)) by HypetheSonics on GRAS RA0045
+        // => transforms have been "compiled" in my head; might be wrong :)
+
+        // all lines of interest start with "- ["
         if !line.starts_with("- [") {
             continue;
         }
+        // =>
+        // - [1MORE Aero (ANC Off)](./HypetheSonics/GRAS%20RA0045%20in-ear/1MORE%20Aero%20(ANC%20Off)) by HypetheSonics on GRAS RA0045
 
         let parts: Vec<&str> = line.split("](").collect();
+        // =>
+        // ["- [1MORE Aero (ANC Off)", "./HypetheSonics/GRAS%20RA0045%20in-ear/1MORE%20Aero%20(ANC%20Off)) by HypetheSonics on GRAS RA0045"]
+
         if parts.len() < 2 {
             continue;
         }
 
         let name_part = parts[0].trim_start_matches("- [");
-        let name = name_part;
+        let name = name_part.to_string();
+        // =>
+        // 1MORE Aero (ANC Off)
+        // println!("cargo:warning=name: {}", name);
+
+        let variant: Option<String> = name_part
+            .split(" (")
+            .nth(1)
+            .map(|s| s.trim_end_matches(")").to_string());
+        // =>
+        // Option("ANC Off")
+        // println!("cargo:warning=variant: {:?}", variant);
 
         let link_part = parts[1];
+        // =>
+        // ./HypetheSonics/GRAS%20RA0045%20in-ear/1MORE%20Aero%20(ANC%20Off)) by HypetheSonics on GRAS RA0045
+
+        let Some(tester_part_str) = link_part.split(" by ").nth(1) else {
+            continue;
+        };
+        // =>
+        // HypetheSonics on GRAS RA0045
+
+        let mut tester_parts = tester_part_str.split(" on ");
+        // =>
+        // Option(["HypetheSonics", "GRAS RA0045"])
+        let tester_name = tester_parts.next().unwrap_or("").trim();
+        if tester_name.is_empty() {
+            continue;
+        }
+        // =>
+        // HypetheSonics
+
+        let test_device = tester_parts.next().map(|s| s.trim());
+        // =>
+        // GRAS RA0045
+
+        // some fuckery required
+        // because some links contain literal brackets as part of the link
         let mut end_index = 0;
-        if let Some(idx) = link_part.find(')') {
+        if let Some(idx) = link_part.rfind(')') {
             end_index = idx;
         }
-
         let result_link = &link_part[..end_index];
+        // =>
+        // ./HypetheSonics/GRAS%20RA0045%20in-ear/1MORE%20Aero%20(ANC%20Off)
+
         let result_link = if let Some(stripped) = result_link.strip_prefix("./")
         {
             stripped
@@ -103,15 +153,24 @@ fn main() {
             result_link
         };
         let result_link = url_decode(result_link);
+        // =>
+        // HypetheSonics/GRAS RA0045 in-ear/1MORE Aero (ANC Off)
+        // println!("cargo:warning=result_link: {:?}", result_link);
 
         let fixed_band_path = repo_dir
             .join("results")
             .join(&result_link)
-            .join(format!("{name} FixedBandEQ.txt", name = name));
+            .join(format!("{} FixedBandEQ.txt", name));
+
+        // println!("cargo:warning=fixed_band_path: {:?}", fixed_band_path);
 
         if !fixed_band_path.exists() {
             continue;
         }
+        // =>
+        // /tmp/autoeq_repo/results/HypetheSonics/GRAS RA0045 in-ear/1MORE Aero (ANC Off) FixedBandEQ.txt
+
+        // println!("cargo:warning=testy shmesty: {:?}", name);
 
         let content = match std::fs::read_to_string(&fixed_band_path) {
             Ok(c) => c,
@@ -142,14 +201,16 @@ fn main() {
             }
         }
 
-        entries
-            .entry(name.to_string())
-            .or_default()
-            .push(HeadphoneResult {
-                name: name.to_string(),
+        let base_name = name.split(" (").next().unwrap_or(&name);
+        entries.entry(base_name.to_string()).or_default().push(
+            HeadphoneResult {
+                tester: tester_name.to_string(),
+                variant,
+                test_device: test_device.map(|s| s.to_string()),
                 preamp,
                 ten_band_eq,
-            });
+            },
+        );
     }
 
     let mut file = BufWriter::new(
@@ -167,8 +228,8 @@ fn main() {
                 results_str.push_str(", ");
             }
             results_str.push_str(&format!(
-                "HeadphoneResult {{ name: {:?}, preamp: {:?}, ten_band_eq: {:?} }}",
-                res.name, res.preamp, res.ten_band_eq
+                "HeadphoneResult {{ tester: {:?}, variant: {:?}, test_device: {:?}, preamp: {:?}, ten_band_eq: {:?} }}",
+                res.tester, res.variant, res.test_device, res.preamp, res.ten_band_eq
             ));
         }
         results_str.push(']');

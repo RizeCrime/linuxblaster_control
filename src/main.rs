@@ -45,7 +45,9 @@ fn main() -> eframe::Result<()> {
 /// mapped to ten bands (31Hz, 62Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz)
 #[derive(Debug, Clone)]
 pub struct HeadphoneResult {
-    pub name: &'static str,
+    pub tester: &'static str,
+    pub variant: Option<&'static str>,
+    pub test_device: Option<&'static str>,
     pub preamp: f32,
     pub ten_band_eq: [f32; 10],
 }
