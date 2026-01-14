@@ -1,5 +1,5 @@
 [package]
-name = "blaster_x_g6_control"
+name = "linuxblaster_control"
 version = "1.1.0"
 edition = "2024"
 
@@ -9,6 +9,7 @@ egui_plot = "0.34.0"
 fuzzy-matcher = "0.3.7"
 hidapi = "2.6.4"
 phf = "0.13.1"
+rfd = "0.17.2"
 serde = "1.0.228"
 serde_json = "1.0.148"
 tracing = "0.1.44"
@@ -17,4 +18,3 @@ tracing-subscriber = "0.3.22"
 [build-dependencies]
 phf_codegen = "0.13.1"
 walkdir = "2.5.0"
-

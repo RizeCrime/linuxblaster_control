@@ -1,21 +1,21 @@
 #![allow(unused)]
 
-use blaster_x_g6_control::{BlasterXG6, Feature, FeatureType};
+use linuxblaster_control::{BlasterXG6, Feature, FeatureType};
 use eframe::egui::{
     self, Button, Color32, Rect, RichText, Stroke, Vec2, accesskit::Size,
 };
 use eframe::egui::{
-    Align, CollapsingHeader, ComboBox, DragValue, Grid, Layout, Margin, Popup,
-    PopupCloseBehavior, ScrollArea, Slider, Widget, Window, widgets,
+    Align, CollapsingHeader, ComboBox, DragValue, Grid, Layout, Margin, Popup, PopupCloseBehavior, ScrollArea, Slider, Vec2b, Widget, Window, widgets
 };
 use egui_plot::{Line, Plot, PlotPoints, log_grid_spacer};
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::env;
 use std::error::Error;
 use std::sync::{LazyLock, Mutex};
-use tracing::debug;
+use tracing::{debug, error, warn};
 
 use crate::{AUTOEQ_DB, AutoEqDb, HeadphoneResult};
 
@@ -26,15 +26,15 @@ mod macros;
 const ISO_BANDS: [f64; 10] = [31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0];
 
 static UI_SELECTED: LazyLock<Mutex<&'static str>> =
-    LazyLock::new(|| Mutex::new("Equalizer"));
+    LazyLock::new(|| Mutex::new("SBX"));
 static AUTOEQ_MODAL: LazyLock<Mutex<bool>> =
     LazyLock::new(|| Mutex::new(false));
 static SEARCH_QUERY: LazyLock<Mutex<String>> =
     LazyLock::new(|| Mutex::new(String::new()));
 static SEARCH_RESULTS: LazyLock<Mutex<Vec<&'static str>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
-
-static CACHE_DIRTY: LazyLock<Mutex<bool>> = LazyLock::new(|| Mutex::new(false));
+static PROFILE_NAME: LazyLock<Mutex<String>> =
+    LazyLock::new(|| Mutex::new(String::new()));
 
 /// Cached feature lookup result
 struct CachedFeature {
@@ -46,26 +46,60 @@ pub struct BlasterApp(pub BlasterXG6);
 
 impl eframe::App for BlasterApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if *CACHE_DIRTY.lock().unwrap() {
-            FEATURE_CACHE.lock().unwrap().clear();
-            *CACHE_DIRTY.lock().unwrap() = false;
+        #[cfg(debug_assertions)]
+        if ctx.input(|i| i.key_pressed(egui::Key::D)) {
+            ctx.set_debug_on_hover(!ctx.debug_on_hover());
         }
 
-        egui::TopBottomPanel::top("top_panel").resizable(true).show(
-            ctx,
-            |ui| {
-                ui.vertical_centered_justified(|ui| {
-                    ui.spacing_mut().window_margin = Margin::symmetric(4, 8);
-                    ui.heading(
-                        RichText::new("Sound BlasterX G6 Control").strong(),
-                    );
+        // if *CACHE_DIRTY.lock().unwrap() {
+        //     FEATURE_CACHE.lock().unwrap().clear();
+        //     *CACHE_DIRTY.lock().unwrap() = false;
+        // }
 
-                    // Global Buttons
-                    ui.horizontal_centered(|ui| {
-                        // Reset All Button
-                        if ui.button("Reset All").clicked() {
-                            let _ = self.0.reset();
-                            *CACHE_DIRTY.lock().unwrap() = true;
+        egui::TopBottomPanel::top("top_panel")
+            .resizable(false)
+            .exact_height(56.0)
+            .show(ctx, |ui| {
+                ui.horizontal_centered(|ui| {
+                    // Reset All Button
+                    if ui.button("Reset All").clicked() {
+                        let _ = self.0.reset();
+                    }
+
+                    // Profile Management 
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if ui.button("Load Profile").clicked() {
+                            let Some(path) = rfd::FileDialog::new() 
+                                .add_filter("Profile", &["json"])
+                                .pick_file()
+                            else {
+                                debug!("No path selected");
+                                return;
+                            };
+
+                            if let Err(error) = self.0.apply_profile(path.clone()) {
+                                error!("Failed to apply profile from file");
+                                error!("Path: {}", path.display());
+                                error!("Error: {}", error);
+                            }
+                        }
+                        
+                        if ui.button("Save Profile").clicked() {
+                            let Some(path) = rfd::FileDialog::new()
+                                .set_file_name("profile.json")
+                                .add_filter("Profile", &["json"])
+                                .set_directory(self.0.profile_path.clone())
+                                .save_file()
+                            else {
+                                debug!("No path selected");
+                                return;
+                            };
+
+                            if let Err(error) = self.0.save_profile(path.clone()) {
+                                error!("Failed to save profile to file");
+                                error!("Path: {}", path.display());
+                                error!("Error: {}", error);
+                            }
                         }
                     });
                 });
@@ -82,7 +116,7 @@ impl eframe::App for BlasterApp {
                         nav_panes!(
                             &mut self.0,
                             ui,
-                            ("SBX", "Equalizer", "Scout Mode",)
+                            ("SBX", "Scout Mode",)
                         );
                     });
                 });
@@ -91,35 +125,38 @@ impl eframe::App for BlasterApp {
             let state = *UI_SELECTED.lock().unwrap();
             match *UI_SELECTED.lock().unwrap() {
                 "SBX" => {
-                    sbx_pane(&mut self.0, ui);
-                }
-                "Equalizer" => {
                     if *AUTOEQ_MODAL.lock().unwrap() {
                         autoeq_pane(&mut self.0, ui);
-                    } else {
-                        eq_pane(&mut self.0, ui);
+                    }
+                    else {
+                        sbx_pane(&mut self.0, ui);
                     }
                 }
                 "Scout Mode" => {
-                    scout_mode_pane(ui);
+                    let _two = 1 + 1;
                 }
-                _ => {}
+                _ => {
+                    warn!("Unknown UI selected: {}", state);
+                }
             }
         });
     }
 }
 
 fn sbx_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
-    Grid::new("sbx_grid").show(ui, |ui| {
-        sbx_feature!(blaster, ui, "Surround");
-        sbx_feature!(blaster, ui, "Dialog+");
-        sbx_feature!(blaster, ui, "Smart Volume");
-        sbx_feature!(blaster, ui, "Crystalizer");
-        sbx_feature!(blaster, ui, "Bass");
+    ui.columns(2, |columns| {
+        // SBX Features
+        columns[0].with_layout(Layout::top_down_justified(Align::TOP), |ui| {
+            sbx_features(blaster, ui);
+        });
+        // Equalizer Sliders
+        columns[1].with_layout(Layout::top_down_justified(Align::TOP), |ui| {
+            eq_features(blaster, ui);
+        });
     });
 }
 
-fn eq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
+fn eq_features(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
     let mut binding = blaster.features.clone();
     let eq_bands: Vec<&mut Feature> = binding
         .iter_mut()
@@ -128,8 +165,8 @@ fn eq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
 
     ui.vertical_centered_justified(|ui| {
         ui.horizontal(|ui| {
-            ui.label(RichText::new("AutoEq: ").color(Color32::GRAY));
-            if ui.button(RichText::new("Select Profile")).clicked() {
+            // Select AutoEq Profile Button
+            if ui.button(RichText::new("Select AutoEq Profile").color(Color32::GRAY)).clicked() {
                 *AUTOEQ_MODAL.lock().unwrap() = true;
             }
         });
@@ -149,109 +186,130 @@ fn eq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
 
         Grid::new("eq_grid").show(ui, |ui| {
             for band in eq_bands {
-                if let Some(value) = band.value.as_f32_mut() {
-                    let clean_name =
-                        band.name.strip_prefix("EQ ").unwrap_or(band.name);
-                    let clean_name =
-                        clean_name.split('-').next().unwrap_or(clean_name);
+                let Some(value) = band.value.as_f32_mut() else {
+                    continue;
+                };
+                let clean_name =
+                    band.name.strip_prefix("EQ ").unwrap_or(band.name);
+                let clean_name =
+                    clean_name.split('-').next().unwrap_or(clean_name);
 
-                    ui.vertical_centered_justified(|ui| {
-                        ui.add_sized(
-                            [ui.available_width(), 24.0],
-                            egui::Label::new(
-                                RichText::new(clean_name).color(Color32::GRAY),
-                            ),
-                        );
-                    });
+                ui.vertical_centered_justified(|ui| {
+                    ui.add_sized(
+                        [ui.available_width(), 24.0],
+                        egui::Label::new(
+                            RichText::new(clean_name).color(Color32::GRAY),
+                        ),
+                    );
+                });
 
-                    let drag_value = ui.add(drag_value!(
-                        value,
-                        suffix = " dB",
-                        decimals = 1,
-                        step = 0.1,
-                        range = -12.0..=12.0
-                    ));
-                    let slider = ui.add(slider!(
-                        value,
-                        vertical = false,
-                        decimals = 1,
-                        step = 0.1,
-                        range = -12.0..=12.0
-                    ));
+                let drag_value = ui.add(drag_value!(
+                    value,
+                    suffix = " dB",
+                    decimals = 1,
+                    step = 0.1,
+                    range = -12.0..=12.0
+                ));
+                let slider = ui.add(slider!(
+                    value,
+                    vertical = false,
+                    decimals = 1,
+                    step = 0.1,
+                    range = -12.0..=12.0
+                ));
 
-                    if drag_value.changed() || slider.changed() {
-                        let _ = blaster.set_slider(band.name, *value);
-                        *CACHE_DIRTY.lock().unwrap() = true;
-                    }
-
-                    ui.end_row();
+                if drag_value.changed() || slider.changed() {
+                    let _ = blaster.set_slider(band.name, *value);
+                    // *CACHE_DIRTY.lock().unwrap() = true;
                 }
+
+                ui.end_row();
             }
         });
     });
 }
 
-fn scout_mode_pane(ui: &mut egui::Ui) {
-    ui.vertical_centered(|ui| {
-        ui.heading("Scout Mode & AutoEq Debug");
+fn sbx_features(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
+    let mut binding = blaster.features.clone();
+    let sbx_features: Vec<&mut Feature> = binding
+        .iter_mut()
+        .filter(|f| 
+            f.name == "Surround" 
+            || f.name == "Dialog+"
+            || f.name == "Smart Volume"
+            || f.name == "Crystalizer"
+            || f.name == "Bass"
+        )
+        .collect();
 
-        let mut search = SEARCH_QUERY.lock().unwrap();
+    let eq_enabled = if let Ok((f, _)) = blaster.get_feature("Equalizer") {
+        f.value.as_bool().unwrap_or(false)
+    } else {
+        error!("Equalizer not found");
+        return;
+    };
+
+    ui.vertical_centered_justified(|ui| {
         ui.horizontal(|ui| {
-            ui.label("Search Headphones:");
-            ui.text_edit_singleline(&mut *search);
+            ui.label(RichText::new("SBX Features").color(Color32::GRAY));
         });
-
         ui.separator();
 
-        if search.is_empty() {
-            ui.label("Enter search term to see results");
-        } else {
-            let search_term = search.to_lowercase();
-            // Access the public static DB
-            let db = &crate::AUTOEQ_DB;
+        Grid::new("sbx_grid").show(ui, |ui| {
+            for feature in sbx_features {
+                let slider_name = format!("{} Slider", feature.name);
+                
+                let mut slider_value = if let Ok((f, _)) = blaster.get_feature(&slider_name) {
+                     f.value.as_f32().unwrap_or(0.0)
+                } else {
+                    error!("Feature Slider not found: {}", feature.name);
+                    continue;
+                };
 
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for (name, results) in db.entries() {
-                    if name.to_lowercase().contains(&search_term) {
-                        ui.push_id(name, |ui| {
-                            ui.group(|ui| {
-                                ui.label(RichText::new(*name).strong());
-                                for (i, res) in results.iter().enumerate() {
-                                    ui.label(format!(
-                                        "Variant: {}",
-                                        res.variant.unwrap_or("")
-                                    ));
-                                    ui.label(format!(
-                                        "Preamp: {} dB",
-                                        res.preamp
-                                    ));
-                                    ui.label(format!(
-                                        "Test Device: {}",
-                                        res.test_device.unwrap_or("Unknown")
-                                    ));
-                                    ui.label(format!("Tester: {}", res.tester));
-                                    ui.push_id(i, |ui| {
-                                        ui.collapsing("EQ Bands", |ui| {
-                                            for (i, gain) in res
-                                                .ten_band_eq
-                                                .iter()
-                                                .enumerate()
-                                            {
-                                                ui.label(format!(
-                                                    "Band {}: {} dB",
-                                                    i + 1,
-                                                    gain
-                                                ));
-                                            }
-                                        });
-                                    });
-                                }
-                            });
-                        });
-                    }
+                let toggle = toggle_button!(
+                    ui, 
+                    feature.value.as_bool().unwrap_or(false), 
+                    feature.name, 
+                    width = full
+                );
+
+                let drag_value = ui.add(drag_value!(
+                    &mut slider_value
+                ));
+                let slider = ui.add(slider!(
+                    &mut slider_value,
+                    vertical = false,
+                ));
+                if toggle.clicked() {
+                    let _ = blaster.set_feature(feature.name, None);
+                    // *CACHE_DIRTY.lock().unwrap() = true;
                 }
-            });
-        }
+                if drag_value.changed() || slider.changed() {
+                    let _ = blaster.set_slider(&slider_name, slider_value);
+                    // *CACHE_DIRTY.lock().unwrap() = true;
+                }
+                ui.end_row();
+            }
+            let eq_toggle = toggle_button!(ui, eq_enabled, "Equalizer", width = full);
+            if eq_toggle.clicked() {
+                let _ = blaster.set_feature("Equalizer", None);
+                // *CACHE_DIRTY.lock().unwrap() = true;
+            }
+            ui.end_row();
+        });
+
+        // Ten Band EQ Plot
+        // (because there was space here, and not on the EQ side of the UI ...)
+        ui.separator();
+        let ten_band_eq = if let Ok((f, _)) = blaster.get_feature("Equalizer") {
+            f.value.as_f32().unwrap_or(0.0)
+        } else {
+            error!("Ten Band EQ not found");
+            return;
+        };
+        ui.add(|ui: &mut egui::Ui| {
+            eq_plot!(ui, blaster.get_ten_band_eq(), width = full, height = full)
+        });
     });
 }
 
@@ -343,8 +401,9 @@ fn autoeq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
                                         ))
                                         .color(Color32::GRAY),
                                     );
-                                    // ui.separator();
                                 });
+                                ui.separator();
+
                                 // eq curve
                                 let plot =
                                     Plot::new(format!("eq_curve_{}_{}_{}", name, result.tester, result.variant.unwrap_or("")))
@@ -371,44 +430,44 @@ fn autoeq_pane(blaster: &mut BlasterXG6, ui: &mut egui::Ui) {
                                         .height(80.0)
                                         .view_aspect(3.0);
 
-                                plot.show(ui, |plot_ui| {
-                                    let points: PlotPoints = (0..=500).map(|i| {
-                                        let t = i as f64 / 500.0; 
-                                        let f = 20.0 * (20000.0 / 20.0_f64).powf(t);
-                                        
-                                        let mut total_y = 0.0; 
-                                        for (idx, gain) in result.ten_band_eq.iter().enumerate() {
-                                            if let Some(&center_freq) = ISO_BANDS.get(idx) {
-                                                if gain.abs() > 0.01 {
-                                                    total_y += calculate_peaking_eq_response(f, center_freq as f64, *gain as f64, 1.41);
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    plot.show(ui, |plot_ui| {
+                                        let points: PlotPoints = (0..=500).map(|i| {
+                                            let t = i as f64 / 500.0; 
+                                            let f = 20.0 * (20000.0 / 20.0_f64).powf(t);
+                                            
+                                            let mut total_y = 0.0; 
+                                            for (idx, gain) in result.ten_band_eq.iter().enumerate() {
+                                                if let Some(&center_freq) = ISO_BANDS.get(idx)
+                                                    && gain.abs() > 0.01 {
+                                                    total_y += calculate_peaking_eq_response(f, center_freq, *gain as f64, 1.41);
                                                 }
                                             }
-                                        }
 
-                                        [f.log10(), total_y]
-                                    }).collect();
+                                            [f.log10(), total_y]
+                                        }).collect();
 
-                                    plot_ui.line(Line::new(format!("eq_curve_{}", name), points).width(2.0));
-                                });
-
-                                let apply_button = ui.button(RichText::new("Apply Profile"));
-                                if apply_button.clicked() {
-                                    for (idx, gain) in result.ten_band_eq.iter().enumerate() {
-                                        if let Some(&center_freq) = ISO_BANDS.get(idx) {
-                                        if gain.abs() > 0.01 {
-                                            let mut feature_name;
-                                            if center_freq < 1000.0 {
-                                                feature_name = format!("EQ {}Hz", center_freq);
-                                            } else {
-                                                feature_name = format!("EQ {}kHz", center_freq / 1000.0);
+                                        plot_ui.line(Line::new(format!("eq_curve_{}", name), points).width(2.0));
+                                    });
+                                    let apply_button = ui.button(RichText::new("Apply Profile"));
+                                    if apply_button.clicked() {
+                                        for (idx, gain) in result.ten_band_eq.iter().enumerate() {
+                                            if let Some(&center_freq) = ISO_BANDS.get(idx)
+                                                && gain.abs() > 0.01 {
+                                                let mut feature_name;
+                                                if center_freq < 1000.0 {
+                                                    feature_name = format!("EQ {}Hz", center_freq);
+                                                } else {
+                                                    feature_name = format!("EQ {}kHz", center_freq / 1000.0);
+                                                }
+                                                let _ = blaster.set_slider(&feature_name, *gain);
                                             }
-                                            let _ = blaster.set_slider(&feature_name, *gain as f32);
                                         }
-                                        }
+                                        let _ = blaster.set_slider("EQ Pre-Amp", result.preamp);
+                                        // *CACHE_DIRTY.lock().unwrap() = true;
                                     }
-                                    let _ = blaster.set_slider("EQ Pre-Amp", result.preamp as f32);
-                                    *CACHE_DIRTY.lock().unwrap() = true;
-                                }
+
+                                });
                             });
                         }
                     });
@@ -427,65 +486,65 @@ fn calculate_peaking_eq_response(freq: f64, center_freq: f64, gain: f64, q: f64)
     gain * falloff
 }
 
-/// Cache for get_feature() results
-static FEATURE_CACHE: LazyLock<Mutex<HashMap<&'static str, CachedFeature>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+// /// Cache for get_feature() results
+// static FEATURE_CACHE: LazyLock<Mutex<HashMap<&'static str, CachedFeature>>> =
+//     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-// the type really isn't all that complex
-// it's a tuple of a Feature and an Option of a slice of strings:
-// Result<(Feature, Option<[&str]>), Error>
-// but all ampercented to make them stack allocated,
-// so it might look a little weird at first ...
-#[allow(clippy::type_complexity)]
-/// Wrapper function that caches the results of get_feature()
-/// Returns cached data without calling get_feature() every time.
-/// On cache miss, uses the provided BlasterXG6 instance to populate the cache.
-fn get_feature_cached(
-    blaster: &BlasterXG6,
-    feature: &'static str,
-) -> Result<(&'static Feature, Option<&'static [&'static str]>), Box<dyn Error>>
-{
-    // Check cache first
-    {
-        let cache = FEATURE_CACHE.lock().unwrap();
-        if let Some(cached) = cache.get(feature) {
-            // Cache hit: return references to boxed data
-            // Safe because Box provides stable addresses in static storage
-            let feature_ref = cached.feature.as_ref() as *const Feature;
-            let deps_ref = cached
-                .dependencies
-                .as_ref()
-                .map(|deps| deps.as_ref() as *const [&'static str]);
+// // the type really isn't all that complex
+// // it's a tuple of a Feature and an Option of a slice of strings:
+// // Result<(Feature, Option<[&str]>), Error>
+// // but all ampercented to make them stack allocated,
+// // so it might look a little weird at first ...
+// #[allow(clippy::type_complexity)]
+// /// Wrapper function that caches the results of get_feature()
+// /// Returns cached data without calling get_feature() every time.
+// /// On cache miss, uses the provided BlasterXG6 instance to populate the cache.
+// fn get_feature_cached(
+//     blaster: &BlasterXG6,
+//     feature: &'static str,
+// ) -> Result<(&'static Feature, Option<&'static [&'static str]>), Box<dyn Error>>
+// {
+//     // Check cache first
+//     {
+//         let cache = FEATURE_CACHE.lock().unwrap();
+//         if let Some(cached) = cache.get(feature) {
+//             // Cache hit: return references to boxed data
+//             // Safe because Box provides stable addresses in static storage
+//             let feature_ref = cached.feature.as_ref() as *const Feature;
+//             let deps_ref = cached
+//                 .dependencies
+//                 .as_ref()
+//                 .map(|deps| deps.as_ref() as *const [&'static str]);
 
-            unsafe {
-                return Ok((&*feature_ref, deps_ref.map(|d| &*d)));
-            }
-        }
-    }
+//             unsafe {
+//                 return Ok((&*feature_ref, deps_ref.map(|d| &*d)));
+//             }
+//         }
+//     }
 
-    // Cache miss: use existing BlasterXG6 instance to populate cache
-    let (feature_ref, dependencies) = blaster.get_feature(feature)?;
+//     // Cache miss: use existing BlasterXG6 instance to populate cache
+//     let (feature_ref, dependencies) = blaster.get_feature(feature)?;
 
-    // Store in cache with Box for stable addresses
-    let cached = CachedFeature {
-        feature: Box::new(feature_ref.clone()),
-        dependencies: dependencies.map(|deps| deps.to_vec().into_boxed_slice()),
-    };
+//     // Store in cache with Box for stable addresses
+//     let cached = CachedFeature {
+//         feature: Box::new(feature_ref.clone()),
+//         dependencies: dependencies.map(|deps| deps.to_vec().into_boxed_slice()),
+//     };
 
-    {
-        let mut cache = FEATURE_CACHE.lock().unwrap();
-        cache.insert(feature, cached);
-    }
+//     {
+//         let mut cache = FEATURE_CACHE.lock().unwrap();
+//         cache.insert(feature, cached);
+//     }
 
-    // Retrieve from cache to return references
-    let cache = FEATURE_CACHE.lock().unwrap();
-    let cached = cache.get(feature).unwrap();
+//     // Retrieve from cache to return references
+//     let cache = FEATURE_CACHE.lock().unwrap();
+//     let cached = cache.get(feature).unwrap();
 
-    let feature_ref = cached.feature.as_ref() as *const Feature;
-    let deps_ref = cached
-        .dependencies
-        .as_ref()
-        .map(|deps| deps.as_ref() as *const [&'static str]);
+//     let feature_ref = cached.feature.as_ref() as *const Feature;
+//     let deps_ref = cached
+//         .dependencies
+//         .as_ref()
+//         .map(|deps| deps.as_ref() as *const [&'static str]);
 
-    unsafe { Ok((&*feature_ref, deps_ref.map(|d| &*d))) }
-}
+//     unsafe { Ok((&*feature_ref, deps_ref.map(|d| &*d))) }
+// }

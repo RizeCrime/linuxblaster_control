@@ -1,12 +1,13 @@
 #![allow(unused)]
 
 use hidapi::{DeviceInfo, HidApi, HidDevice};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
+use std::env;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::fs;
-use std::io::ErrorKind;
+use std::fs::{self, File, create_dir_all};
+use std::io::{BufReader, BufWriter, ErrorKind};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use tracing::{debug, warn};
@@ -18,6 +19,14 @@ pub const VENDOR_ID: u16 = 0x041e;
 pub const PRODUCT_ID: u16 = 0x3256;
 pub const INTERFACE: i32 = 4;
 
+const ISO_BANDS: [f64; 10] = [
+    31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
+];
+
+/// ### Important
+/// Many Features have a Toggle and a Slider.
+/// The Slider must always be named to match this format:
+/// `format!("{} Slider", feature.name)`
 pub const FEATURES: &[Feature] = &[
     // Master Features (Format 2)
     Feature {
@@ -173,7 +182,7 @@ pub const FEATURES: &[Feature] = &[
     },
 ];
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Format {
     Global(u8),
     SBX(u8),
@@ -186,7 +195,7 @@ impl Display for Format {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FeatureType {
     Toggle(bool),
     Slider(f32),
@@ -258,7 +267,7 @@ impl FeatureType {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize)]
 pub struct Feature {
     pub name: &'static str,
     pub id: Format,
@@ -266,10 +275,42 @@ pub struct Feature {
     pub dependencies: Option<&'static [&'static str]>,
 }
 
+impl<'de> Deserialize<'de> for Feature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>, {
+        #[derive(Deserialize)]
+        struct FeatureData {
+            name: String,
+            value: FeatureType,
+        }
+
+        let data = FeatureData::deserialize(deserializer)?;
+
+        if let Some(static_feature) =
+            FEATURES.iter().find(|f| f.name == data.name)
+        {
+            let mut feature = static_feature.clone();
+            feature.value = data.value;
+            Ok(feature)
+        } else {
+            Err(serde::de::Error::custom(format!(
+                "Feature not found: {}",
+                data.name
+            )))
+        }
+    }
+}
+
+#[derive(Serialize)]
 pub struct BlasterXG6 {
-    pub device: DeviceInfo,
-    pub connection: HidDevice,
     pub features: Vec<Feature>,
+    #[serde(skip)]
+    pub device: DeviceInfo,
+    #[serde(skip)]
+    pub connection: HidDevice,
+    #[serde(skip)]
+    pub profile_path: PathBuf,
 }
 
 impl BlasterXG6 {
@@ -280,10 +321,96 @@ impl BlasterXG6 {
         let _ = connection.set_blocking_mode(false);
 
         Ok(Self {
+            features: FEATURES.to_vec(),
             device,
             connection,
-            features: FEATURES.to_vec(),
+            profile_path: PathBuf::from(format!(
+                "{}linuxblaster/profiles/",
+                env::var("XDG_DATA_HOME").unwrap_or_else(|_| format!(
+                    "{}/.local/share/",
+                    env::var("HOME").expect("HOME is not set")
+                )),
+            )),
         })
+    }
+
+    /// Loads a profile from a file and creates a new BlasterXG6
+    pub fn from_profile(path: PathBuf) -> Result<Self, Box<dyn Error>> {
+        todo!()
+    }
+
+    /// Saves the current state of the features to a profile
+    pub fn save_profile(&self, path: PathBuf) -> Result<(), Box<dyn Error>> {
+        debug!("===== save_profile =====");
+        debug!("Profile:");
+        debug!("- path:         {}", path.display());
+
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent)?;
+        }
+
+        // don't save sliders, if they're 0
+        // don't save toggles, if they're off
+        let mut changed_features: Vec<Feature> = Vec::new();
+        self.features
+            .iter()
+            .for_each(|feature| match feature.value {
+                FeatureType::Toggle(value) => {
+                    if !value {
+                        return;
+                    }
+                    changed_features.push(feature.clone());
+                }
+                FeatureType::Slider(value) => {
+                    if value == 0.0 {
+                        return;
+                    }
+                    changed_features.push(feature.clone());
+                }
+            });
+
+        let file = File::create(path)?;
+        let writer = BufWriter::new(file);
+        serde_json::to_writer_pretty(writer, &changed_features)?;
+        debug!("Profile saved ¯\\_(ツ)_/¯");
+        debug!("===== save_profile completed =====");
+
+        Ok(())
+    }
+
+    pub fn apply_profile(
+        &mut self,
+        path: PathBuf,
+    ) -> Result<(), Box<dyn Error>> {
+        let features: Vec<Feature> = self.open_profile(path)?;
+        features.iter().try_for_each(|feature| {
+            match feature.value {
+                FeatureType::Toggle(value) => {
+                    debug!("Applying toggle: {}", feature.name);
+                    debug!("- value: {}", value);
+                    self.set_feature(feature.name, Some(value))?;
+                }
+                FeatureType::Slider(value) => {
+                    if value.abs() > 0.0 {
+                        debug!("Applying slider: {}", feature.name);
+                        debug!("- value: {}", value);
+                        self.set_slider(feature.name, value)?;
+                    }
+                }
+            }
+            Ok::<(), Box<dyn Error>>(())
+        })?;
+        Ok(())
+    }
+
+    pub fn open_profile(
+        &self,
+        path: PathBuf,
+    ) -> Result<Vec<Feature>, Box<dyn Error>> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let features: Vec<Feature> = serde_json::from_reader(reader)?;
+        Ok(features.clone())
     }
 
     /// Resets all features to their default state (Sliders: 0, Toggles: Off)
@@ -413,6 +540,46 @@ impl BlasterXG6 {
             })
     }
 
+    /// Gets a mutable reference to a Feature by name
+    /// ### Returns a Mutable Reference to the Feature
+    /// Note that it's assumed you don't want dependencies if you need a mutable reference.
+    pub fn get_feature_mut(
+        &mut self,
+        feature: impl Into<String> + Clone,
+    ) -> Result<&mut Feature, Box<dyn Error>> {
+        self.features
+            .iter_mut()
+            .find(|f| f.name == feature.clone().into())
+            .ok_or_else(|| {
+                Box::<dyn Error>::from(std::io::Error::new(
+                    ErrorKind::NotFound,
+                    format!("Feature {} not found", feature.clone().into()),
+                ))
+            })
+    }
+
+    /// #### Returns 11 Bytes, actually
+    /// - 1 Byte for the Pre-Amp
+    /// - 10 Bytes for the 10 EQ Bands
+    pub fn get_ten_band_eq(&self) -> Option<[f32; 11]> {
+        let mut bands: [f32; 11] = [0.0; 11];
+        bands[0] = self.get_feature("EQ Pre-Amp").ok()?.0.value.as_f32()?;
+
+        for (idx, band) in ISO_BANDS.iter().enumerate() {
+            let feature_name = if *band < 1000.0 {
+                format!("EQ {}Hz", band)
+            } else {
+                format!("EQ {}kHz", band / 1000.0)
+            };
+            let Ok(feature) = self.get_feature(feature_name) else {
+                return None;
+            };
+            bands[idx + 1] = feature.0.value.as_f32().unwrap_or(0.0);
+        }
+
+        Some(bands)
+    }
+
     /// Sets the Value of a Feature to On of Off
     /// ### **None**:
     /// - Toggles the feature between On and Off
@@ -492,16 +659,28 @@ impl BlasterXG6 {
             debug!("- dependents: {:?}", dependents);
 
             for dependent in dependents {
-                // Only disable if it's a toggle feature
-                if let Ok((f, _)) = self.get_feature(dependent)
-                    && matches!(f.value, FeatureType::Toggle(_))
-                {
-                    if f.value.as_bool() == Some(false) {
-                        debug!("Dependent already disabled: {}", dependent);
-                        continue;
+                let Ok((feature, _)) = self.get_feature(dependent) else {
+                    continue;
+                };
+                match feature.value {
+                    FeatureType::Toggle(value) => {
+                        if value {
+                            debug!("Dependent already disabled: {}", dependent);
+                            continue;
+                        }
+                        debug!("Disabling dependent feature: {}", dependent);
+                        let _ = self.set_feature(dependent, Some(false));
                     }
-                    debug!("Disabling dependent feature: {}", dependent);
-                    let _ = self.set_feature(dependent, Some(false));
+                    FeatureType::Slider(value) => {
+                        // yes this is on purpose
+                        // but only temporarily; let's see how long it'll stay
+                        // if value == 0.0 {
+                        //     debug!("Dependent already disabled: {}", dependent);
+                        //     continue;
+                        // }
+                        // debug!("Disabling dependent feature: {}", dependent);
+                        // let _ = self.set_slider(dependent, 0.0);
+                    }
                 }
             }
         }

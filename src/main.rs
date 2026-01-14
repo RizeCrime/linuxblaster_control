@@ -2,8 +2,8 @@
 
 use std::sync::LazyLock;
 
-use blaster_x_g6_control::BlasterXG6;
-use eframe::egui::{self, ahash::HashMap, mutex::Mutex};
+use eframe::egui::{self, Vec2, ahash::HashMap, mutex::Mutex};
+use linuxblaster_control::BlasterXG6;
 use tracing::Level;
 
 mod app;
@@ -18,7 +18,9 @@ fn main() -> eframe::Result<()> {
     let app = BlasterApp(device);
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_resizable(true),
+        viewport: egui::ViewportBuilder::default()
+            .with_resizable(true)
+            .with_inner_size(Vec2::new(1050.0, 600.0)),
         // .with_inner_size()
         ..Default::default()
     };
