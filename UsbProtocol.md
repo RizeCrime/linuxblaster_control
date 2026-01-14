@@ -8,6 +8,7 @@ The device uses multiple command formats with hierarchical dependencies:
 - **Format 2 (0x26)**: Master/system-level controls that gate other features
 - **Format 1 (0x1207/0x1103)**: Audio processing features (requires SBX enabled via Format 2)
 - **Format 3 (0x3a)**: RGB lighting control (independent)
+
 (Naming was done in the order I found them, the numbers don't mean anything special; Call them Alice, Bob, and Chungus if you want) 
 
 ---

@@ -109,7 +109,7 @@ cd linuxblaster_control
 nix build
 ```
 
-### Option 3: Building from Source
+### Building from Source
 
 ```bash
 # Clone the repository
