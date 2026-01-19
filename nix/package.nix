@@ -9,13 +9,23 @@
 , hidapi
 , makeDesktopItem
 , copyDesktopItems
+, fetchFromGitHub
 }:
 
 rustPlatform.buildRustPackage rec {
-  pname = "blaster-x-g6-control";
-  version = "1.1.0";
+  pname = "linuxblaster_control";
+  version = "2.0.0";
 
   src = lib.cleanSource ../.;
+
+  autoeq_data = fetchFromGitHub {
+    owner = "jaakkopasanen";
+    repo = "AutoEq";
+    rev = "master";
+    sha256 = "sha256-/kj5ITqtaEWtcZkmB5DEIfj44otXKXYBE7ArV++YLkM=";
+  };
+
+  env.AUTOEQ_REPO_DIR = autoeq_data;
 
   cargoLock = {
     lockFile = ../Cargo.lock;
@@ -50,24 +60,29 @@ rustPlatform.buildRustPackage rec {
   postInstall = ''
     # Install udev rules
     install -Dm644 ${./99-soundblaster-g6.rules} $out/lib/udev/rules.d/99-soundblaster-g6.rules
-    
-    # Install README and LICENSE
+
+    # README and LICENSE
     install -Dm644 ${../README.md} $out/share/doc/${pname}/README.md
     install -Dm644 ${../LICENSE} $out/share/licenses/${pname}/LICENSE
     
-    # Install icon if it exists
-    if [ -f ${../LinuxblasterCommand.png} ]; then
-      install -Dm644 ${../LinuxblasterCommand.png} $out/share/pixmaps/blaster-x-g6-control.png
+    # Icon if it exists
+    if [ -f ${../LinuxblasterControl.png} ]; then
+      install -Dm644 ${../LinuxblasterControl.png} $out/share/pixmaps/linuxblaster_control.png
     fi
+  '';
+
+  postFixup = ''
+    # Add runtime dependencies to the binary
+    patchelf --add-rpath "${lib.makeLibraryPath [ udev wayland libxkbcommon libGL libglvnd ]}" $out/bin/linuxblaster_control
   '';
 
   desktopItems = [
     (makeDesktopItem {
-      name = "blaster-x-g6-control";
-      desktopName = "Sound Blaster X G6 Control";
-      comment = "Control Creative Sound Blaster X G6 audio settings";
-      exec = "blaster_x_g6_control";
-      icon = "blaster-x-g6-control";
+      name = "Linuxblaster Control";
+      desktopName = "Linuxblaster Control";
+      comment = "Control the Creative Sound Blaster X G6 USB DAC/Amp";
+      exec = "linuxblaster_control";
+      icon = "";
       categories = [ "Audio" "AudioVideo" "Settings" ];
       keywords = [ "sound" "audio" "equalizer" "dac" "creative" ];
       terminal = false;
@@ -77,23 +92,11 @@ rustPlatform.buildRustPackage rec {
   meta = with lib; {
     description = "Native Linux GUI application to control the Creative Sound Blaster X G6";
     longDescription = ''
-      A native Linux GUI application to control the Creative Sound Blaster X G6 USB DAC/Amp.
-      Built with Rust using egui for the interface and hidapi for USB HID communication.
-      
-      Features:
-      - Surround Sound control with slider
-      - Crystalizer audio enhancement
-      - Bass boost
-      - Smart Volume
-      - Dialog Plus
-      - Night Mode & Loud Mode
-      - 10-Band Equalizer (31Hz – 16kHz, ±12 dB)
-      - Preset Management for saving and loading configurations
     '';
     homepage = "https://github.com/RizeCrime/linuxblaster_control";
     license = licenses.mit;
     maintainers = [ ];
-    mainProgram = "blaster_x_g6_control";
+    mainProgram = "linuxblaster_control";
     platforms = platforms.linux;
   };
 }

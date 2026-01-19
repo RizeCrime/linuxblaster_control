@@ -38,41 +38,49 @@ fn url_decode(s: &str) -> String {
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=AUTOEQ_REPO_DIR");
+
+    let env_path = env::var("AUTOEQ_REPO_DIR").ok();
+
+    let binding = env_path.clone().unwrap_or("/tmp/autoeq_repo".to_string());
 
     let repo_url = "https://github.com/jaakkopasanen/AutoEq";
-    let repo_dir = Path::new("/tmp/autoeq_repo");
+    let repo_dir = Path::new(&binding);
 
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("autoeq_db.rs");
 
-    let mut output: std::process::Output;
+    if env_path.is_none() {
+        let mut output: std::process::Output;
 
-    if !repo_dir.exists() {
-        output = std::process::Command::new("git")
-            .arg("clone")
-            .arg("--depth=1")
-            .arg(repo_url)
-            .arg(repo_dir)
-            .output()
-            .expect("Failed to clone AutoEq repository");
-    } else {
-        output = std::process::Command::new("git")
-            .current_dir(repo_dir)
-            .arg("pull")
-            .output()
-            .expect("Failed to pull AutoEq repository");
-    }
+        if !repo_dir.exists() {
+            output = std::process::Command::new("git")
+                .arg("clone")
+                .arg("--depth=1")
+                .arg(repo_url)
+                .arg(repo_dir)
+                .output()
+                .expect("Failed to clone AutoEq repository");
+        } else {
+            output = std::process::Command::new("git")
+                .current_dir(repo_dir)
+                .arg("pull")
+                .output()
+                .expect("Failed to pull AutoEq repository");
+        }
 
-    if !output.status.success() {
-        eprintln!("cargo:error=Failed to clone or update AutoEq repository");
-        // We might not want to fail the build if net is down, but for now strict.
-        std::process::exit(1);
+        if !output.status.success() {
+            eprintln!(
+                "cargo:error=Failed to clone or update AutoEq repository"
+            );
+            panic!("Failed to clone or update AutoEq repository");
+        }
     }
 
     let index_path = repo_dir.join("results/INDEX.md");
     if !index_path.exists() {
-        eprintln!("cargo:warning=INDEX.md not found in AutoEq repo");
-        return;
+        eprintln!("cargo:error=INDEX.md not found in AutoEq repo");
+        panic!("INDEX.md not found in AutoEq repo");
     }
 
     let index = std::fs::read_to_string(index_path).unwrap();

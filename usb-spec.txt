@@ -142,7 +142,7 @@
 ---
 
 # 10-Band EQ
-# Unlike other sliders (0.0-1.0 normalized), EQ bands use RAW dB values as IEEE 754 floats!
+# Unlike other sliders (0.0-1.0 normalized), EQ bands use RAW dB values as IEEE 754 floats
 # Range appears to be approximately -12dB to +12dB
 #
 # EQ Toggle:     0x09
@@ -184,8 +184,6 @@
 ---
 
 # 0x26 Command Family (Alternative Toggles)
-# Uses a DIFFERENT command format - 0x26 command family instead of 0x1207/0x1103!
-# No magic number 0x0196 present
 # Pattern: SET + COMMIT (symmetric for ON/OFF)
 
 # SBX Toggle OFF:
@@ -251,17 +249,14 @@
 #   0x01 = ON
 #
 # Notes:
-# - COMMIT command is IDENTICAL for all 0x26 features (truly feature-agnostic!)
-# - Bytes 3 and 3 in SET (0x07) and COMMIT (0x08) match Crystalizer IDs from Format 1
+# - COMMIT command is IDENTICAL for all 0x26 features 
 # - Feature ID at byte 4 determines which feature is being controlled
 # - SBX controls ability to enable/disable individual Format 1 audio features
-# - Scout Mode is independent gaming audio enhancement
 
 ---
 
 # RGB Toggle
-# Uses ANOTHER different command format - 0x3a command family!
-# No magic number 0x0196, no DATA+COMMIT pattern
+# 0x3a command family
 # Asymmetric: OFF = 1 command, ON = 3 commands
 
 # RGB OFF (single command):
@@ -322,7 +317,7 @@
 #        └─────────────────────────────────────────────────────── Magic byte
 
 # Notes:
-# - OFF requires only 1 command, ON requires 3 - very different from SBX toggle!
+# - OFF requires only 1 command, ON requires 3 - very different from SBX toggle
 # - Command 1 looks like simple enable/disable toggle
 # - Commands 2 & 3 might set RGB mode, pattern, or default colors
 # - Bytes in command 3 (ff,00,00,ff) could be RGBA color values (red with full alpha?)
