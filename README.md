@@ -1,38 +1,45 @@
-# Sound Blaster X G6 Control for Linux
+# Linuxblaster Control 
+(because it sounds mildly funny) 
 
 A native Linux GUI application to control the **Creative Sound BlasterX G6** USB DAC/Amp, with full [AutoEq](https://github.com/jaakkopasanen/AutoEq) integration. 
 
 ![Screenshot](LinuxblasterControl.png)
 
+## v2.1 - now with State Reading 
+
+The Software can now read out the State of the Device, instead of having to track it internally.  
+Note that the G6 has two internal settings profiles, one for Headphones and one for Speakers. The App will auto-refresh its state from device on Output switching.  
+
+Do note tho: Profile Loading is currently still a little buggy when a Slider was saved with a non-zero Value and its corresponding Toggle turned off. 
+
 ## Supported Features
 
+- **State Reading**
 - **Profiles**
-  - Saving & Loading
+	- Saving & Loading (mostly working)
+	- Profile Save Location
 - **SBX**
-  - Surround Sound
-  - Dialog+
-  - Smart Volume 
-  - Crystalizer 
-  - Bass 
-  - Equalizer 
-    - PreAmp
-    - 10-band EQ
+	- Surround Sound
+	- Dialog+
+	- Smart Volume 
+	- Crystalizer 
+	- Bass 
+	- Equalizer 
+		- PreAmp
+		- 10-band EQ
+- **Playback**
+	- Output Toggle 
 - **Scout Mode** 
-- Reset All(-ish)
 
 ## Not-Yet-Implemented Features
 
-- **Profiles** 
-  - Profile Save Location
 - **SBX** 
   - Smart Volume Sub-Features
     - Night Mode & Loud Mode
   - Equalizer Sub-Features 
     - SBC Eq Presets 
 - **Playback**
-  - Direct Mode 
-  - Output Select
-  - Output Toggle 
+  - Direct Mode (not planned) 
   - Filter
   - Audio Quality 
 - **Recording**
@@ -51,7 +58,8 @@ A native Linux GUI application to control the **Creative Sound BlasterX G6** USB
 
 ## Presets
 
-Presets are stored as JSON files in `~/.local/share/linuxblaster/presets/`.
+Presets are stored as JSON files in `~/.local/share/linuxblaster/presets/`. 
+Presets from before v2.1 will have to be remade, the old format is no longer compatible. 
 
 > [!IMPORTANT]
 > The preset format is custom to this application and is **not compatible** with official Creative Sound Blaster Command profiles (.json or .xml) from Windows.
@@ -155,7 +163,6 @@ In that case, Launch it from a cli and check the logs (if I configured them corr
 
 ### Current Limitations
 
-- **No state reading** — Cannot read current device state from the hardware on startup; the application starts with default values.
 - **Limited testing** — Tested only on the developer's hardware.
 - The USB protocol was reverse-engineered and may not cover all device features.
 - Some features available in the Windows Sound Blaster Command software are not yet implemented.
@@ -168,7 +175,7 @@ In that case, Launch it from a cli and check the logs (if I configured them corr
 
 Communication uses 65-byte HID reports with a custom protocol consisting of DATA and COMMIT packets.
 
-Find the details in [UsbProtocol](UsbProtocol.md) (and [usb-spec](usb-spec.txt)).
+Find the details in [UsbProtocol](UsbProtocol.md).  
 
 ## Contributing
 
@@ -179,12 +186,14 @@ Contributions are welcome! If you have a Sound Blaster X G6 and want to help:
 
 ## Acknowledgments
 
-This project builds upon the USB protocol research from the [soundblaster-x-g6-cli](https://github.com/nils-skowasch/soundblaster-x-g6-cli) project by Nils Skowasch, which provided initial USB packet captures and protocol documentation. Additional reverse engineering (including the 10-band EQ protocol) was done for this project.
+~~This project builds upon the USB protocol research from the [soundblaster-x-g6-cli](https://github.com/nils-skowasch/soundblaster-x-g6-cli) project by Nils Skowasch, which provided initial USB packet captures and protocol documentation. Additional reverse engineering (including the 10-band EQ protocol) was done for this project.~~  
+The initial versions of this project were based on the [soundblaster-x-g6-cli](https://github.com/nils-skowasch/soundblaster-x-g6-cli) project. However, it turns out that this work was misleadingly incomplete. What was thought to be a Commit Push from the Host was actually the Device reporting back a queried value, just as an example. I have done a bunch of extra reverse engineering to figure out the actual full protocol (see the sniffer directory), at least I _think_ that I've got the full picture this time; but that's also what I thought before, so who knows /shrug. 
 
 ## AI Disclaimer 
 
 With v2 I can proudly say that all Code was written by me (In v1 the GUI was written by AI (and you could tell)). 
-I do, however, use AI liberally to beautify anything user-facing (including this README and most other .md files); I have spent my entire holidays on this project in ADHD Hyperfocus mode, you do **not** want to see my raw documentation... might be enough for a diagnosis on its own. 
+I do, however, use AI liberally to beautify anything user-facing (including this README and most other .md files).  
+I also used AI to fill out match arms and enums (and other repetetive code-writing), because by Talos there was a lot of that and I decided that writing the structure and logic had exhausted the all the fun to be had.  
 
 ## License
 
