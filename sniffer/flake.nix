@@ -44,10 +44,14 @@
             pkgs.wireshark
             pkgs.acl      # For setfacl
             snifferScript
+            pkgs.pkg-config
+            pkgs.systemd
+            pkgs.libusb1 
             pkgs.usbutils
           ];
           
           shellHook = ''
+            export LD_LIBRARY_PATH="${pkgs.systemd}/lib:${pkgs.libusb1}/lib:$LD_LIBRARY_PATH"
             echo "Environment ready!"
             echo "Run 'sniff-usb' to set up permissions and start Wireshark."
           '';

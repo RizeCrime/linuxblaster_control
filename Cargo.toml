@@ -7,9 +7,12 @@ edition = "2024"
 eframe = "0.33.3"
 egui_plot = "0.34.0"
 fuzzy-matcher = "0.3.7"
-hidapi = "2.6.4"
+hidapi = { version = "2.6.4", default-features = false, features = [
+    "linux-static-libusb",
+] }
 phf = "0.13.1"
 rfd = "0.17.2"
+rusb = "0.9.4"
 serde = "1.0.228"
 serde_json = "1.0.148"
 tracing = "0.1.44"

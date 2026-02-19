@@ -81,6 +81,7 @@
               rustToolchain
               openssl
               pkg-config
+              libusb1
               cargo-deny
               cargo-edit
               cargo-watch
@@ -97,6 +98,7 @@
               # python
               (pkgs.python312.withPackages (
                 python-pkgs: with python-pkgs; [
+                  pyusb
                   libusb1 
                   hidapi 
                 ]
@@ -106,7 +108,7 @@
             env = {
               # Required by rust-analyzer
               RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
-              LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.udev pkgs.wayland pkgs.libxkbcommon pkgs.libGL pkgs.libglvnd pkgs.openssl ]}";
+              LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.udev pkgs.wayland pkgs.libxkbcommon pkgs.libGL pkgs.libglvnd pkgs.openssl pkgs.libusb1]}";
             };
           };
         }

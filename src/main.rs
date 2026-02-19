@@ -14,7 +14,7 @@ fn main() -> eframe::Result<()> {
         .with_max_level(Level::DEBUG)
         .init();
 
-    let device = BlasterXG6::init().expect("Failed to initialize device");
+    let device = BlasterXG6::init();
     let app = BlasterApp(device);
 
     let options = eframe::NativeOptions {

@@ -238,17 +238,38 @@ macro_rules! eq_plot {
     (@parse ($ui:expr) ($gains_opt:expr) ($w:expr) ($h:expr) ($a:expr)) => {{
         if let Some(gains) = $gains_opt {
             let mut plot = Plot::new("current_eq_curve")
-                .x_grid_spacer(log_grid_spacer(10))
+                .x_grid_spacer(move |input: GridInput| {
+                    let (min, max) = input.bounds;
+                    ISO_BANDS
+                        .iter()
+                        .map(|&freq| freq as f64)
+                        .filter(|&freq| {
+                            let log_freq = freq.log10();
+                            log_freq >= min && log_freq <= max
+                        })
+                        .map(|freq| GridMark {
+                            value: freq.log10(),
+                            step_size: 1000.0,
+                        })
+                        .collect()
+                })
                 .x_axis_formatter(|x, _range| {
                     let freq = 10.0_f64.powf(x.value);
+                    let idx = ISO_BANDS
+                        .iter()
+                        .position(|&b| (b - freq).abs() < 1.0)
+                        .unwrap_or(10);
+                    if idx % 2 != 0 {
+                        return String::new();
+                    }
                     if freq >= 1000.0 {
-                        format!("{} kHz", freq / 1000.0)
+                        format!("{}kHz", (freq / 1000.0).round() as i64)
                     } else {
-                        format!("{} Hz", freq)
+                        format!("{}Hz", freq.round() as i64)
                     }
                 })
                 .y_axis_min_width(40.0)
-                // .y_axis_formatter(|_mark, _range| String::from(" "))
+                .y_axis_formatter(|y, _range| format!("{} dB", y.value.round() as i64))
                 .show_axes(Vec2b::new(true, false))
                 .show_grid(true)
                 .include_y(-12.0)
@@ -259,7 +280,33 @@ macro_rules! eq_plot {
                 .allow_zoom(false)
                 .allow_drag(false)
                 .allow_axis_zoom_drag(false)
-                .allow_boxed_zoom(false);
+                .allow_boxed_zoom(false)
+                .label_formatter(|name, value| {
+                    let freq = 10.0_f64.powf(value.x);
+                    let freq_str = if freq >= 1000.0 {
+                        format!("{}kHz", (freq / 1000.0).round() as i64)
+                    } else {
+                        format!("{}Hz", freq.round() as i64)
+                    };
+                    let db_str = format!("{:.1}dB", value.y);
+                    if name.is_empty() {
+                        format!("{freq_str}, {db_str}")
+                    } else {
+                        format!("{name}\n{freq_str}, {db_str}")
+                    }
+                })
+                .coordinates_formatter(
+                    Corner::RightTop,
+                    CoordinatesFormatter::new(|value, _bounds| {
+                        let freq = 10.0_f64.powf(value.x);
+                        let freq_str = if freq >= 1000.0 {
+                            format!("{}kHz", (freq / 1000.0).round() as i64)
+                        } else {
+                            format!("{}Hz", freq.round() as i64)
+                        };
+                        format!("{}, {:.1}dB", freq_str, value.y)
+                    }),
+                );
 
             if $a {
                 plot = plot.view_aspect(3.0);
