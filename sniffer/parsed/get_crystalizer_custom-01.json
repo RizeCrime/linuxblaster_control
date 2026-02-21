@@ -1,0 +1,14 @@
+[
+  {
+    "id": "0xffff8f0217b47200",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x07"
+      }
+    }
+  }
+]

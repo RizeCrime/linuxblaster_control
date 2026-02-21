@@ -1,0 +1,31 @@
+[
+  {
+    "id": "0xffff8f020ea94e40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x07"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f020e9a3500",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "CrystalizerToggle",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  }
+]

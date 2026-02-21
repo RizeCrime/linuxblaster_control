@@ -1,0 +1,45 @@
+[
+  {
+    "id": "0xffff8e2d911cacc0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DacFilterWrite",
+        "filter": "Slow Roll-off, Minimum Phase"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cb380",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x6c"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cb200",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DacFilterReadRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ec6a480",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DacFilterReadResponse",
+        "filter": "Slow Roll-off, Minimum Phase"
+      }
+    }
+  }
+]

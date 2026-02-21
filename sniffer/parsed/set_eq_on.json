@@ -1,0 +1,74 @@
+[
+  {
+    "id": "0xffff8e2d8ed1ea80",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "EqToggle",
+          "value": 5.831554e-39
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1b00",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1e540",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x09"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7d8c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7dbc0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  }
+]

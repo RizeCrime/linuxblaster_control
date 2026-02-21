@@ -1,0 +1,74 @@
+[
+  {
+    "id": "0xffff8f0217b47200",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "CrystalizerToggle",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8f021ce10000",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f020e9a38c0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x07"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f021ce11980",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "CrystalizerToggle",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f020e9a3b00",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "CrystalizerToggle",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  }
+]

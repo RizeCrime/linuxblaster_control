@@ -1,0 +1,809 @@
+[
+  {
+    "id": "0xffff8f020a01e9c0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceIdentifyRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f020a01e9c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceIdentifyResponse",
+        "flags": "0x1f"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f020a01e9c0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GetSerialRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f020a01e9c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GetSerialResponse",
+        "serial": "0xef, 0x67, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f020a01e9c0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GetHardwareIdRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bc180",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GetHardwareIdResponse",
+        "hw_id": "0x97"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bc180",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GetDspVersionRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bc180",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GetDspVersionResponse",
+        "version": "0x30, 0x01, 0x10, 0x00"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bc180",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "Ping"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bc180",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "Ping"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bc180",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GetFirmwareStringRequest",
+        "typ": "0x02"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bc180",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GetFirmwareStringResponse",
+        "firmware": "2.1.250903.1324\u0000"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b47380",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x00"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b47380",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "SurroundToggle",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b47380",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x01"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b47380",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "SurroundLevel",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b47380",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x02"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "DialogPlusToggle",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x03"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "DialogPlusLevel",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x04"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "SmartVolToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x05"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "SmartVolLevel",
+            "value": 0.5
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x06"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "SmartVolMode",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x07"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "CrystalizerToggle",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x08"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "CrystalizerLevel",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x09"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0a"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqPreAmp",
+            "value": -3.3
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0b"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq31Hz",
+            "value": 3.5
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0c"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq62Hz",
+            "value": -0.8
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f02185bdd40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0d"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq125Hz",
+            "value": -1.6
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0e"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq250Hz",
+            "value": 0.4
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0f"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq500Hz",
+            "value": 0.5
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x10"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq1kHz",
+            "value": 0.8
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x11"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq2kHz",
+            "value": -1.7
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq4kHz",
+            "value": -1.1
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x13"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq8kHz",
+            "value": 2.4
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x14"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq16kHz",
+            "value": -2.8
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x17"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "SurroundDistance",
+            "value": 80.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "CrystalizerToggle",
+          "value": 5.831554e-39
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8f0217b46840",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8f020ea0efc0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "CrystalizerToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  }
+]

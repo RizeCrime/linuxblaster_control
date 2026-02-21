@@ -1,0 +1,65 @@
+[
+  {
+    "id": "0xffff8e2e78b218c0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GlobalProfileWrite",
+        "feature": "SBX Master",
+        "enabled": false
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ec6a600",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x26"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911ca9c0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GlobalProfileRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ec6b740",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ec6a480",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GlobalProfileResponse",
+        "sbx_master": false,
+        "scout_mode": false,
+        "eq_enable": false
+      }
+    }
+  }
+]

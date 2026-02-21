@@ -1,0 +1,1571 @@
+[
+  {
+    "id": "0xffff8e2d8ed1eb40",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "OutputSelectWrite",
+        "output": "Speakers"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece12c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "OutputSelectReadResponse",
+        "output": "Speakers"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cbb00",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "SurroundLevel",
+            "value": 0.5
+          },
+          {
+            "family": "0x96",
+            "name": "DialogPlusLevel",
+            "value": 0.5
+          },
+          {
+            "family": "0x96",
+            "name": "SmartVolLevel",
+            "value": 0.74
+          },
+          {
+            "family": "0x96",
+            "name": "SmartVolMode",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "CrystalizerToggle",
+            "value": 1.0
+          },
+          {
+            "family": "0x96",
+            "name": "CrystalizerLevel",
+            "value": 0.5
+          },
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          },
+          {
+            "family": "0x96",
+            "name": "EqPreAmp",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cb080",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq31Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq62Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq125Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq250Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq500Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq1kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq2kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq4kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0b40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq8kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq16kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "SurroundDistance",
+            "value": 80.0
+          },
+          {
+            "family": "0x96",
+            "name": "BassToggle",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "BassLevel",
+            "value": 0.5
+          },
+          {
+            "family": "0x96",
+            "name": "Unknown_0x70",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Unknown_0x71",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Unknown_0x72",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b20480",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x95",
+            "name": "id_0x00",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x04",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x05",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x0a",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x0b",
+            "value": 400.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x0c",
+            "value": 1400.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x0d",
+            "value": 2000.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x0e",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7ce40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x95",
+            "name": "id_0x0f",
+            "value": 1.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x10",
+            "value": 1.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x11",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x12",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x13",
+            "value": 1.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x14",
+            "value": -3.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x15",
+            "value": -4.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x16",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7d200",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x95",
+            "name": "id_0x17",
+            "value": 2.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x18",
+            "value": 3.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x19",
+            "value": -3.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x1a",
+            "value": 4.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x1b",
+            "value": 5.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x1c",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x1d",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x1e",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7cb40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x95",
+            "name": "id_0x1f",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x20",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x21",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x22",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x23",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x24",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x25",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x26",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7d380",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x2c"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0a80",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "OutputSelectReadRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7c000",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "OutputSelectReadResponse",
+        "output": "Speakers"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7ce40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x95",
+            "name": "id_0x27",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x28",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x29",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x2a",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x2b",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x2c",
+            "value": 0.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x2d",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7d200",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "SurroundToggle",
+            "value": 1.0
+          },
+          {
+            "family": "0x96",
+            "name": "CrystalizerToggle",
+            "value": 1.0
+          },
+          {
+            "family": "0x96",
+            "name": "DialogPlusToggle",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "BassToggle",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "SmartVolToggle",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "SmartVolLevel",
+            "value": 0.74
+          },
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          },
+          {
+            "family": "0x96",
+            "name": "EqPreAmp",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7cb40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq31Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq62Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq125Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq250Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq500Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq1kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq2kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq4kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7d380",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GlobalProfileResponse",
+        "sbx_master": true,
+        "scout_mode": false,
+        "eq_enable": true
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7c000",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GlobalProfileResponse",
+        "sbx_master": true,
+        "scout_mode": false,
+        "eq_enable": true
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7ce40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GlobalProfileResponse",
+        "sbx_master": true,
+        "scout_mode": false,
+        "eq_enable": false
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7d200",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq8kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq16kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          },
+          {
+            "family": "0x95",
+            "name": "id_0x13",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7cb40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "Notification",
+        "sub": "0x01"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1ecc0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "EqPreAmp",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7d380",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7c000",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqPreAmp",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1fec0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0a"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7ce40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqPreAmp",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1e300",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq31Hz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d89a7d200",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1f140",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0b"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0cc0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq31Hz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1e900",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq62Hz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece00c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1fb00",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0c"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1140",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq31Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq62Hz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1980",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq62Hz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1fe00",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq125Hz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1ec0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1fbc0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0d"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0cc0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq125Hz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1f380",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq250Hz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece00c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1f740",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0e"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1140",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq250Hz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1f200",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq500Hz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1980",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq125Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq250Hz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1ec0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b21bc0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x0f"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0cc0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq500Hz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b212c0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq1kHz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cae40",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b20fc0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x10"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911ca780",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq1kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b20f00",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq2kHz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cb380",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq500Hz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq1kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911ca480",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b21080",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x11"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0cc0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq2kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b218c0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq4kHz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece03c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b21200",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0600",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq4kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b21b00",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq8kHz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1680",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq2kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq4kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece09c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b21800",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x13"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0cc0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq8kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b21c80",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "Eq16kHz",
+          "value": 0.0
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece03c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b21ec0",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x14"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0600",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq16kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e78b21980",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "EqToggle",
+          "value": 5.831554e-39
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1680",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "Eq8kHz",
+            "value": 0.0
+          },
+          {
+            "family": "0x96",
+            "name": "Eq16kHz",
+            "value": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece09c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cb740",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x09"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0cc0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece03c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1e780",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "WriteSingleFeature",
+        "feature": {
+          "family": "0x96",
+          "name": "EqToggle",
+          "value": 5.831554e-39
+        }
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0600",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "DeviceAck",
+        "echoed_cmd": "0x12"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cb8c0",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1ef00",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusRequest",
+        "family": "0x96",
+        "feature_id": "0x09"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e333a2d80",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "StatusResponse",
+        "features": [
+          {
+            "family": "0x96",
+            "name": "EqToggle",
+            "value": 1.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ed1f500",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GainConfigRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e333a3500",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GainConfigResponse",
+        "gain": "0x02"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0d80",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GainConfigRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2e333a2240",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GainConfigResponse",
+        "gain": "0x02"
+      }
+    }
+  }
+]

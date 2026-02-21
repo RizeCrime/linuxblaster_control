@@ -1,0 +1,44 @@
+[
+  {
+    "id": "0xffff8e2d8ed1f980",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GainConfigRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d911cad80",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GainConfigResponse",
+        "gain": "0x02"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece1440",
+    "typ": "Submit",
+    "endpoint": "HostOut",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GainConfigRequest"
+      }
+    }
+  },
+  {
+    "id": "0xffff8e2d8ece0480",
+    "typ": "Complete",
+    "endpoint": "HostIn",
+    "data_fragment": {
+      "SbProtocol": {
+        "type": "GainConfigResponse",
+        "gain": "0x02"
+      }
+    }
+  }
+]
