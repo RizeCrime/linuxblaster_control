@@ -54,6 +54,7 @@ rustPlatform.buildRustPackage rec {
     libxkbcommon
     libGL
     libglvnd
+    libusb1 
   ];
 
   # Skip tests that require HOME directory and device access
