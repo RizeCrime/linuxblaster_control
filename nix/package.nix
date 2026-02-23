@@ -6,6 +6,7 @@
 , libxkbcommon
 , libGL
 , libglvnd
+, libusb1 
 , hidapi
 , makeDesktopItem
 , copyDesktopItems
@@ -42,6 +43,7 @@ rustPlatform.buildRustPackage rec {
     libxkbcommon
     libGL
     libglvnd
+    libusb1 
     hidapi
   ];
 
