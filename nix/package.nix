@@ -76,7 +76,7 @@ rustPlatform.buildRustPackage rec {
 
   postFixup = ''
     # Add runtime dependencies to the binary
-    patchelf --add-rpath "${lib.makeLibraryPath [ udev wayland libxkbcommon libGL libglvnd ]}" $out/bin/linuxblaster_control
+    patchelf --add-rpath "${lib.makeLibraryPath [ udev wayland libxkbcommon libGL libglvnd libusb1 ]}" $out/bin/linuxblaster_control
   '';
 
   desktopItems = [
