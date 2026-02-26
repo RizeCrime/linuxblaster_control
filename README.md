@@ -135,6 +135,7 @@ cargo build --release
 
 You will need the following packages at a minimum:
 - hidapi 
+- libusb1 (libusb1-devel)
 - udev
 
 ### Nix Development Shell
