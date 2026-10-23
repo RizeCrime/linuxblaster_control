@@ -1,0 +1,4 @@
+# Linuxblaster Control: let the logged-in user control the Sound BlasterX G6.
+# Grants access to the G6's HID control interface (hidraw) only.
+# Numbered below 73 so TAG+="uaccess" takes effect.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="041e", ATTRS{idProduct}=="3256", MODE="0666", TAG+="uaccess"

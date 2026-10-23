@@ -5,91 +5,58 @@ A native Linux GUI application to control the **Creative Sound BlasterX G6** USB
 
 ![Screenshot](LinuxblasterControl.png)
 
-## v2.1 - now with State Reading 
-
-The Software can now read out the State of the Device, instead of having to track it internally.  
-Note that the G6 has two internal settings profiles, one for Headphones and one for Speakers. The App will auto-refresh its state from device on Output switching.  
-
-Changes made on the device itself (e.g. the SBX and Scout Mode buttons) and to the hardware mixer (e.g. the volume knob) are picked up while the app is running.
-
-## Supported Features
-
-- **State Reading**
-- **Profiles**
-	- Saving & Loading
-	- Profile Save Location
-- **SBX**
-	- Surround Sound
-	- Dialog+
-	- Smart Volume (incl. Night & Loud Mode)
-	- Crystalizer 
-	- Bass 
-	- Equalizer 
-		- PreAmp
-		- 10-band EQ
-		- AutoEq Profiles
-- **Playback**
-	- Output Select 
-	- DAC Filter
-- **Recording**
-	- Mic Recording Volume & Monitoring
-	- Mic Boost
-	- Voice Clarity: Noise Reduction, Acoustic Echo Cancellation, Smart Volume
-	- Mic EQ (Presets & individual Bands)
-- **Decoder**
-	- Normal, Full, and Night
-- **Mixer**
-	- Playback, Monitoring, and Recording Levels
-	- Recording Source
-- **Lighting**
-	- On/Off & Color
-- **Scout Mode** 
-
-## Not-Implemented Features
-
-- **Playback**
-  - Direct Mode (not planned) 
-  - Speaker/Headphone Channel Configuration (Stereo/5.1/7.1)
-- **Lighting**
-  - Effects other than a static color (no captures yet)
-
-**Audio Quality** (bit depth / sample rate) is not a setting of the device: whatever plays or records audio picks the format for each stream (on Linux that's usually PipeWire). Configure it there, e.g. with PipeWire's `default.clock.allowed-rates`.
-
-### About the Mixer
-
-The Mixer (and the volume/monitoring sliders in Recording) are the G6's own hardware controls, defined by the USB Audio Class standard. They're changed through ALSA, which only forwards them to the device, the same way Windows does. Nothing is processed in software, so recordings stay exactly as the hardware produces them.
-
-## Presets
-
-Presets are stored as JSON files in `~/.local/share/linuxblaster/presets/`. 
-Presets from before v2.1 will have to be remade, the old format is no longer compatible. 
-
-> [!IMPORTANT]
-> The preset format is custom to this application and is **not compatible** with official Creative Sound Blaster Command profiles (.json or .xml) from Windows.
-
-## Requirements
-
-- Linux (tested on x86_64)
-- Sound Blaster X G6 connected via USB
-- udev rules for HID access (see below)
-
-The device is accessed through the kernel's hidraw interface, so starting the app no longer resets the USB device (which used to interrupt audio for a moment). A reset is only done as a fallback if the device doesn't respond.
-
-### udev Rules
-
-To access the device without root privileges, create a udev rule:
-
-``` js (not actually js, just makes for a good highlighting)
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="041e", ATTRS{idProduct}=="3256", MODE="0666"
-```
-
-You may need to unplug and replug the device after adding the rule.
-
 ## Installation
 
-### Nix
+You don't need to know anything about programming to use this. Download one file, install it like any other app, and you're done.
 
-Add to your NixOS configuration:
+### 1. Download the right file
+
+Go to the **[latest release](https://github.com/RizeCrime/linuxblaster_control/releases/latest)** and download **one** file from the *Assets* list:
+
+| Your Linux                                                     | Download the file ending in |
+|----------------------------------------------------------------|-----------------------------|
+| **Ubuntu, Linux Mint, Pop!_OS, Zorin OS, elementary OS, Debian** | `_amd64.deb`                |
+| **Fedora, Nobara, openSUSE**                                   | `.x86_64.rpm`               |
+| **Anything else** (Arch, Manjaro, EndeavourOS, Bazzite, …), or if you'd rather not install anything | `-x86_64.AppImage` |
+| **NixOS**                                                      | see [NixOS](#nixos) below   |
+
+> [!TIP]
+> Almost every desktop PC and laptop needs the `amd64` / `x86_64` files.
+> The `arm64` / `aarch64` files are only for ARM computers, such as a Raspberry Pi or a Snapdragon laptop.
+
+### 2. Install it
+
+**`.deb` (Ubuntu, Mint, …):** double-click the file and click *Install*.
+If double-clicking doesn't work, open a terminal in your Downloads folder and run:
+```bash
+sudo apt install ./linuxblaster-control_*_amd64.deb
+```
+
+**`.rpm` (Fedora, openSUSE):** double-click the file and click *Install*, or run:
+```bash
+sudo dnf install ./linuxblaster-control-*.x86_64.rpm      # Fedora
+sudo zypper install ./linuxblaster-control-*.x86_64.rpm   # openSUSE
+```
+
+**AppImage:** no installation needed. Right-click the file → *Properties* → *Permissions* → enable *Allow executing file as program* (the exact wording depends on your desktop). Then double-click it.
+
+### 3. Start it
+
+Plug in your G6 and open **Linuxblaster Control** from your application menu (or double-click the AppImage).
+
+The first time you start the AppImage, the app will ask to **allow access** to the G6. That's a one-time setup that lets your user account control the device. Click *Allow access* and enter your password. The `.deb` and `.rpm` packages do this automatically during installation.
+
+### Uninstall
+
+- `.deb`: `sudo apt remove linuxblaster-control`
+- `.rpm`: `sudo dnf remove linuxblaster-control` (or `sudo zypper remove linuxblaster-control`)
+- AppImage: delete the file. To also remove the access rule: `sudo rm /etc/udev/rules.d/70-linuxblaster-control.rules`
+
+Your saved profiles stay in `~/.local/share/linuxblaster/profiles/`.
+
+### NixOS
+
+Add the flake to your configuration; this installs the app (with menu entry) and the access rule:
 
 ```nix
 {
@@ -108,58 +75,145 @@ Add to your NixOS configuration:
 }
 ```
 
-or 
-```bash
-# Run without installing
-nix run github:RizeCrime/linuxblaster_control
+Or try it without installing: `nix run github:RizeCrime/linuxblaster_control`
 
-# Install to user profile
-nix profile install github:RizeCrime/linuxblaster_control
+## Troubleshooting
 
-# Build locally
-git clone https://github.com/RizeCrime/linuxblaster_control.git
-cd linuxblaster_control
-nix build
-```
+**"No Sound BlasterX G6 found"**
+Make sure the G6 is connected with a USB *data* cable (not a charge-only cable) and switched on. The app connects by itself as soon as the G6 shows up.
+
+**"Access is not allowed yet", even after clicking *Allow access***
+Unplug the G6 and plug it back in, then click *Try again*.
+
+**The AppImage doesn't start when double-clicked**
+Check that it's allowed to run (see step 2). On some systems AppImages also need FUSE: install `libfuse2` (Ubuntu 22.04, Debian) or `libfuse2t64` (Ubuntu 24.04 and newer), or use the `.deb`/`.rpm` instead.
+
+**My microphone isn't picked up**
+Open *Mixer* → *Recording Source* and select **External Mic**. (The G6 starts on *Line In* on Linux.)
+
+**My settings changed when I switched between Speakers and Headphones**
+That's how the G6 works: it keeps a separate set of settings for each output.
+
+**Something else is wrong**
+Start the app from a terminal with `linuxblaster_control` (or `./Linuxblaster_Control-*.AppImage`) and [open an issue](https://github.com/RizeCrime/linuxblaster_control/issues) with what it prints.
+
+## About
+
+The app reads the current state from the G6 itself, so it always shows what the device is actually set to.
+The G6 has two internal settings profiles, one for Headphones and one for Speakers; the app refreshes everything when you switch the output.
+Changes made on the device itself (e.g. the SBX and Scout Mode buttons) and to the hardware mixer (e.g. the volume knob) show up while the app is running.
+The app also saves its last settings and re-applies them on the next launch; see [Last State on Launch](#last-state-on-launch).
+
+## Supported Features
+
+- **State Reading**
+	- Live link monitor (connected / reconnected / disconnected, Direct Mode, SBX, Scout, output)
+	- Last-state restore on launch
+- **Profiles**
+	- Saving & Loading
+	- Profile Save Location
+- **SBX**
+	- Surround Sound
+	- Dialog+
+	- Smart Volume (incl. Night & Loud Mode)
+	- Crystalizer 
+	- Bass 
+	- Equalizer 
+		- PreAmp
+		- 10-band EQ
+		- AutoEq Profiles
+- **Playback**
+	- Output Select 
+	- DAC Filter
+	- Direct Mode (full DSP bypass; controlled by the SBX switch)
+- **Recording**
+	- Mic Recording Volume & Monitoring
+	- Mic Boost
+	- Voice Clarity: Noise Reduction, Acoustic Echo Cancellation, Smart Volume
+	- Mic EQ (Presets & individual Bands)
+- **Decoder**
+	- Normal, Full, and Night
+- **Mixer**
+	- Playback, Monitoring, and Recording Levels
+	- Recording Source
+- **Lighting**
+	- On/Off & Color
+- **System**
+	- Virtual 7.1 headphones sink (1:1 port of the G6 downmixer APO, f64)
+	- PipeWire volume sync with the active output
+	- SINAD fix: hardware volume capped at −2.00 dB
+- **Scout Mode** 
+
+## Not-Implemented Features
+
+- **Playback**
+  - Speaker/Headphone Channel Configuration (Stereo/5.1/7.1)
+- **Lighting**
+  - Effects other than a static color (no captures yet)
+
+**Audio Quality** (bit depth / sample rate) is not a setting of the device: whatever plays or records audio picks the format for each stream (on Linux that's usually PipeWire). Configure it there, e.g. with PipeWire's `default.clock.allowed-rates`.
+
+### About the Mixer
+
+The Mixer (and the volume/monitoring sliders in Recording) are the G6's own hardware controls, defined by the USB Audio Class standard. They're changed through ALSA, which only forwards them to the device, the same way Windows does. Nothing is processed in software, so recordings stay exactly as the hardware produces them.
+
+## Profiles
+
+Profiles are stored as JSON files in `~/.local/share/linuxblaster/profiles/`.
+A profile applies to the output that is currently active (Speakers or Headphones).
+Profiles from before v2.1 will have to be remade, the old format is no longer compatible.
+
+> [!IMPORTANT]
+> The profile format is custom to this application and is **not compatible** with official Creative Sound Blaster Command profiles (.json or .xml) from Windows.
+
+## Direct Mode
+
+Direct Mode is a full bypass of the G6's DSP. While it is on, SBX, the equalizer, Scout Mode, Voice Clarity/VoiceFx and the decoder are inactive; the app grays out the panes that cannot work and closes the AutoEQ wizard.
+
+The SBX master switch is the only control: turning SBX off enters Direct Mode, turning it back on leaves it. The app also checks the device state every two seconds and never leaves SBX and Direct Mode on together.
+
+Changing the mode makes the G6 re-enumerate its USB interfaces. Audio drops for about two seconds, the control endpoint disappears, and the app reopens it automatically. The status bar shows the current link state, Direct Mode, SBX, Scout, output and the number of reconnects.
+
+## Last State on Launch
+
+The app writes its current settings to `~/.local/share/linuxblaster/last_state.json` after a change (at most once every two seconds while dragging) and when the window closes. On the next launch it compares the file with the device and writes only the differences, so settings the G6 kept in NVRAM are not rewritten. The output is restored first (settings are stored per output), and SBX/Direct Mode last because they switch the DSP path and can re-enumerate the device. The speaker volume is intentionally not restored.
+
+A corrupt or incompatible snapshot is renamed to `last_state.json.bad` and ignored, so it cannot block every launch. This is separate from the profiles in `~/.local/share/linuxblaster/profiles/`.
+
+No separate daemon is needed: the app is the controller and restores its own state when it starts. It autostarts with the desktop session on KDE; if your desktop does not restore running applications, add the app's `.desktop` file to `~/.config/autostart/`.
+
+## Virtual 7.1 Sink and Volume Sync
+
+The System pane can install a virtual 7.1 sink for headphones. It is a PipeWire filter-chain that feeds the G6 Pro output. 7.1 PCM arrives at the sink and is downmixed by a **1:1 code port of the Sound BlasterX G6 downmixer APO** (`CMatrixEncoderEfxMod` from `KSUSBAPO64.dll`, fully decoded and verified bit-exact in g6-re). The port runs in **f64 instead of the original f32** — the only difference.
+
+The installer ships the plugin with the app: `libg6ct_ladspa_f64.so` is compiled from the vendored MIT sources in `vendor/g6ct/`, carried inside the binary, and written to `~/.local/lib/linuxblaster/` on install. No source checkout, build step, or download is needed. The installer then writes a PipeWire config for the G6 sink that is actually attached and restarts `pipewire.service`. Installing it briefly interrupts audio.
+
+The toggle routes the default output between the G6 Pro sink (direct) and the virtual sink. When **sync volume** is enabled, the active sink's PipeWire volume is the single volume control and the inactive gain stage stays at 100%; the volume is carried over when the output switches.
+
+The **SINAD fix** limits the hardware Speaker control to raw `124/128` — 97% on the slider, which is −2.00 dB. The cap is enforced on every write, and if another client or the knob pushes the hardware volume above it, the app restores the cap automatically.
+
+## For Developers
 
 ### Building from Source
 
+You need a Rust toolchain, a C compiler (`cc`) for the vendored g6ct plugin, and these development packages:
+
+| Distro          | Packages                                    |
+|-----------------|---------------------------------------------|
+| Debian / Ubuntu | `pkg-config libudev-dev libasound2-dev`     |
+| Fedora          | `pkgconf systemd-devel alsa-lib-devel`      |
+| Arch            | `pkgconf systemd-libs alsa-lib`             |
+
 ```bash
-# Clone the repository
 git clone https://github.com/RizeCrime/linuxblaster_control.git
 cd linuxblaster_control
-
-# Build release binary
 cargo build --release
-
-# Run
 ./target/release/linuxblaster_control
 ```
 
-### System Dependencies
+Without the packages, you'll also need the udev rule for access to the device: copy [`packaging/70-linuxblaster-control.rules`](packaging/70-linuxblaster-control.rules) to `/etc/udev/rules.d/` (or use the *Allow access* button in the app).
 
-You will need the following packages at a minimum:
-- hidapi 
-- libusb1 (libusb1-devel)
-- udev (libudev-devel)
-- alsa-lib (alsa-lib-devel / libasound2-dev)
-
-### Nix Development Shell
-
-A `flake.nix` is provided for Nix users who want to develop:
-
-```bash
-nix develop  # Enter development shell with all dependencies
-cargo build --release
-```
-
-## Usage
-
-Simply run the application while the Sound Blaster X G6 is connected:
-
-```bash
-./linuxblaster_control
-```
+The device is accessed through the kernel's hidraw interface, so starting the app doesn't reset the USB device (which would interrupt audio for a moment). A reset is only done as a fallback if the device doesn't respond.
 
 To print the current device state without the GUI (read-only):
 
@@ -167,8 +221,17 @@ To print the current device state without the GUI (read-only):
 cargo run --example dump_state
 ```
 
-If the device is not detected, the application won't start. 
-In that case, Launch it from a cli and check the logs (if I configured them correctly, which I'm not too sure about). 
+### Nix
+
+```bash
+nix develop   # development shell with all dependencies
+nix build     # build the package
+```
+
+### Release Packages
+
+[`packaging/build-release.sh`](packaging/build-release.sh) builds the `.tar.gz`, `.deb`, `.rpm` and AppImage for the current architecture into `dist/`.
+On GitHub, the [Release workflow](.github/workflows/release.yml) runs it for x86_64 and aarch64 whenever a release is published and attaches the files to the release. The package version is taken from the release tag.
 
 ## ⚠️ Development Status
 
@@ -204,10 +267,12 @@ The initial versions of this project were based on the [soundblaster-x-g6-cli](h
 
 ## AI Disclaimer 
 
-With v2 I can proudly say that almost all Code was written by me (In v1 the GUI was written by AI (and you could tell)), and AI only filled out match arms and enums for me. 
+~~With v2 I can proudly say that almost all Code was written by me (In v1 the GUI was written by AI (and you could tell)), and AI only filled out match arms and enums for me. 
 I also use AI liberally to beautify anything user-facing (including this README and most other .md files).  
-Oh and the math for the EQ curve visualizer was also done by AI. 
+Oh and the math for the EQ curve visualizer was also done by AI. ~~
+After getting the project to a "good enough" state for my own purposes, I sadly don't have the time for this project anymore.  
+It will mostly be maintained by an LLM under my supervision from v2.2 and onwards. 
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details. The vendored g6ct downmixer in `vendor/g6ct/` is MIT as well.

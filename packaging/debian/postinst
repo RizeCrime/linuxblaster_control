@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+# Apply the udev rule to an already plugged-in G6, so no replug is needed.
+if [ "$1" = "configure" ] && command -v udevadm >/dev/null 2>&1; then
+    udevadm control --reload-rules >/dev/null 2>&1 || true
+    udevadm trigger --subsystem-match=hidraw --action=change >/dev/null 2>&1 || true
+fi
+#DEBHELPER#

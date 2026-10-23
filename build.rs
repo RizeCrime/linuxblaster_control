@@ -40,6 +40,8 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=AUTOEQ_REPO_DIR");
 
+    build_g6ct_plugin();
+
     let env_path = env::var("AUTOEQ_REPO_DIR").ok();
 
     let binding = env_path.clone().unwrap_or("/tmp/autoeq_repo".to_string());
@@ -254,4 +256,49 @@ fn main() {
         map.build()
     )
     .unwrap();
+}
+
+/// Builds the vendored g6ct LADSPA plugin as a shared object in `OUT_DIR`,
+/// where `system.rs` embeds it with `include_bytes!`.
+///
+/// The flags mirror `g6-re/port/Makefile`: `-ffp-contract=off` and
+/// `-fno-fast-math` are part of the numerical contract, not tuning knobs.
+/// Without them the port stops matching the APO bit-for-bit.
+fn build_g6ct_plugin() {
+    let manifest = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).to_path_buf();
+    let source = manifest.join("vendor/g6ct");
+    let out = Path::new(&env::var("OUT_DIR").unwrap()).to_path_buf();
+    let target = out.join("libg6ct_ladspa_f64.so");
+
+    println!("cargo:rerun-if-changed=vendor/g6ct/g6ct.c");
+    println!("cargo:rerun-if-changed=vendor/g6ct/g6ct.h");
+    println!("cargo:rerun-if-changed=vendor/g6ct/g6ct_ladspa.c");
+
+    let compiler = env::var("CC").unwrap_or_else(|_| "cc".to_owned());
+    let status = std::process::Command::new(&compiler)
+        .args([
+            "-std=c11",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-ffp-contract=off",
+            "-fno-fast-math",
+            "-DG6CT_DOUBLE",
+            "-fPIC",
+            "-shared",
+        ])
+        .arg("-o")
+        .arg(&target)
+        .arg(source.join("g6ct_ladspa.c"))
+        .arg(source.join("g6ct.c"))
+        .arg("-lm")
+        .status()
+        .unwrap_or_else(|error| {
+            panic!("couldn't run {compiler} to build the g6ct plugin: {error}")
+        });
+
+    assert!(
+        status.success(),
+        "building libg6ct_ladspa_f64.so with {compiler} failed"
+    );
 }

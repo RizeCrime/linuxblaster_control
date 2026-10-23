@@ -17,12 +17,15 @@ jobs:
 
     steps:
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y libusb-1.0-0-dev libudev-dev libhidapi-dev libasound2-dev
+      run: sudo apt-get update && sudo apt-get install -y pkg-config libudev-dev libasound2-dev
       
     - uses: actions/checkout@v4
     
     - name: Build
       run: cargo build --release --verbose
+
+    - name: Test
+      run: cargo test --release
 
     - name: Upload Binary
       uses: actions/upload-artifact@v4

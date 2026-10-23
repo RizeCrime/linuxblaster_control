@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="#1b1b1b" stroke="#333333" stroke-width="4"/>
+  <!-- equalizer bars -->
+  <g fill="#0b6a94">
+    <rect x="46"  y="120" width="24" height="88" rx="8"/>
+    <rect x="82"  y="80"  width="24" height="128" rx="8"/>
+    <rect x="118" y="132" width="24" height="76" rx="8"/>
+    <rect x="154" y="64"  width="24" height="144" rx="8"/>
+    <rect x="190" y="104" width="24" height="104" rx="8"/>
+  </g>
+  <!-- EQ curve, like the plot in the app -->
+  <path d="M 34 132 C 60 110, 74 74, 94 74 S 118 128, 130 126 S 150 54, 166 58 S 196 104, 222 92"
+        fill="none" stroke="#d0504a" stroke-width="10" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,65 @@
+name: Release
+
+# Builds the downloadable packages and attaches them to a GitHub release.
+#
+# Runs automatically when a release is published. To (re)build the packages
+# for an existing release, start it by hand under Actions → Release →
+# "Run workflow" and enter the release tag.
+#
+# The package version is taken from the tag (v2.3.0 → 2.3.0).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag of the existing release to build for (e.g. v2.3.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  package:
+    name: Package (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 22.04 = glibc 2.35, so the binaries run on any distro
+          # from about 2022 on (Ubuntu 22.04+, Debian 12+, Fedora 36+, ...)
+          - runner: ubuntu-22.04
+            arch: x86_64
+          - runner: ubuntu-22.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libudev-dev libasound2-dev file
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install packaging tools
+        run: cargo install --locked cargo-deb cargo-generate-rpm
+
+      - name: Build packages
+        run: packaging/build-release.sh "$TAG"
+
+      - name: Attach packages to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/* --clobber

@@ -1,5 +1,5 @@
 {
-  description = "Sound Blaster X G7 Control for Linux - A native GUI application to control the Creative Sound Blaster X G6";
+  description = "Linuxblaster Control - A native GUI application to control the Creative Sound Blaster X G6";
 
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1"; # unstable Nixpkgs
@@ -61,14 +61,7 @@
         {
           default = pkgs.blaster-x-g6-control;
           blaster-x-g6-control = pkgs.blaster-x-g6-control;
-          
-          # Debian package output
-          deb = pkgs.callPackage ./nix/deb.nix {
-            rustPlatform = pkgs.makeRustPlatform {
-              cargo = pkgs.rustToolchain;
-              rustc = pkgs.rustToolchain;
-            };
-          };
+          # .deb/.rpm/AppImage packages are built by packaging/build-release.sh
         }
       );
 
@@ -137,15 +130,12 @@
               self.packages.${pkgs.system}.blaster-x-g6-control
               (pkgs.runCommand "linuxblaster-symlink" {} ''
                 mkdir -p $out/bin
-                ln -s ${self.packages.${pkgs.system}.blaster-x-g6-control}/bin/blaster_x_g6_control $out/bin/${cfg.commandName}
+                ln -s ${self.packages.${pkgs.system}.blaster-x-g6-control}/bin/linuxblaster_control $out/bin/${cfg.commandName}
               '')
             ];
 
-            # Add udev rules for device access
-            services.udev.extraRules = ''
-              # Creative Sound Blaster X G6
-              SUBSYSTEM=="hidraw", ATTRS{idVendor}=="041e", ATTRS{idProduct}=="3256", MODE="0666"
-            '';
+            # udev rule for device access (lib/udev/rules.d in the package)
+            services.udev.packages = [ self.packages.${pkgs.system}.blaster-x-g6-control ];
           };
         };
     };
