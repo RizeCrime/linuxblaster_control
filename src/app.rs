@@ -1,8 +1,9 @@
 // #![allow(unused)]
 
 use linuxblaster_control::{
-    BlasterXG6, ConnectError, DEFAULT_BASE_PATH, FeatureId, MIC_EQ_PRESETS,
-    UDEV_RULE, UDEV_RULE_PATH, ValueKind, remember_last_profile,
+    BlasterXG6, ConnectError, DEFAULT_BASE_PATH, FeatureId, LinkState,
+    MIC_EQ_PRESETS, UDEV_RULE, UDEV_RULE_PATH, ValueKind,
+    remember_last_profile,
 };
 use eframe::egui::{
     self, Button, Color32, RichText, Vec2, Vec2b,
@@ -39,6 +40,17 @@ static PROFILE_NAME: LazyLock<Mutex<String>> =
     LazyLock::new(|| Mutex::new(String::new()));
 static LAST_MIXER_REFRESH: LazyLock<Mutex<Instant>> =
     LazyLock::new(|| Mutex::new(Instant::now()));
+static LAST_DEVICE_MONITOR: LazyLock<Mutex<Instant>> =
+    LazyLock::new(|| Mutex::new(Instant::now()));
+static DEVICE_LINK: LazyLock<Mutex<LinkState>> =
+    LazyLock::new(|| Mutex::new(LinkState::Connected));
+static DEVICE_RECONNECTS: LazyLock<Mutex<u64>> =
+    LazyLock::new(|| Mutex::new(0));
+/// Write count that has already been persisted, if any.
+static LAST_SAVED_WRITES: LazyLock<Mutex<Option<u64>>> =
+    LazyLock::new(|| Mutex::new(None));
+static LAST_STATE_SAVE: LazyLock<Mutex<Instant>> =
+    LazyLock::new(|| Mutex::new(Instant::now()));
 
 /// How often the UI checks for state the device pushed on its own
 /// (hardware buttons, cascading changes after writes).
@@ -46,6 +58,13 @@ const DEVICE_POLL_INTERVAL: Duration = Duration::from_millis(250);
 /// The hardware mixer can also change outside of this app
 /// (volume knob, pavucontrol, ...), so it's re-read periodically.
 const MIXER_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
+/// The G6 re-enumerates after Direct Mode and can be unplugged at any time.
+/// A cheap ping every two seconds keeps the link (and the state display)
+/// honest without flooding the control endpoint.
+const DEVICE_MONITOR_INTERVAL: Duration = Duration::from_secs(2);
+/// Writes the last-state snapshot at most this often while a setting is
+/// being dragged. Slider drags emit a write on every frame.
+const LAST_STATE_SAVE_INTERVAL: Duration = Duration::from_secs(2);
 
 
 pub struct BlasterApp(pub BlasterXG6);
@@ -58,6 +77,8 @@ impl eframe::App for BlasterApp {
         }
 
         self.0.process_device_events();
+        poll_device(&self.0);
+        persist_last_state(&self.0);
         {
             let mut last_refresh = LAST_MIXER_REFRESH.lock().unwrap();
             if last_refresh.elapsed() >= MIXER_REFRESH_INTERVAL {
@@ -123,6 +144,73 @@ impl eframe::App for BlasterApp {
                 });
             },
         );
+        egui::TopBottomPanel::bottom("g6_status")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    let link = *DEVICE_LINK.lock().unwrap();
+                    let (color, text) = match link {
+                        LinkState::Connected => (
+                            Color32::from_rgb(80, 200, 120),
+                            "G6 connected",
+                        ),
+                        LinkState::Reconnected => (
+                            Color32::from_rgb(230, 190, 80),
+                            "G6 reconnected",
+                        ),
+                        LinkState::Disconnected => (
+                            Color32::from_rgb(230, 100, 100),
+                            "G6 disconnected — retrying",
+                        ),
+                    };
+                    ui.colored_label(color, "●");
+                    ui.label(text);
+
+                    ui.separator();
+
+                    let direct = direct_mode_on(&self.0);
+                    let sbx =
+                        self.0.feature(FeatureId::SbxMaster).value() > 0.5;
+                    let scout =
+                        self.0.feature(FeatureId::ScoutMode).value() > 0.5;
+                    ui.label(format!(
+                        "Direct Mode: {}",
+                        if direct { "on" } else { "off" }
+                    ));
+                    ui.separator();
+                    ui.label(format!(
+                        "SBX: {}",
+                        if sbx { "on" } else { "off" }
+                    ));
+                    ui.separator();
+                    ui.label(format!(
+                        "Scout: {}",
+                        if scout { "on" } else { "off" }
+                    ));
+
+                    ui.separator();
+                    let output = self.0.feature(FeatureId::Output).value();
+                    let output = if output > 0.5 {
+                        "Headphones"
+                    } else if output == 0.0 {
+                        "Speakers"
+                    } else {
+                        "unknown"
+                    };
+                    ui.label(format!("Output: {}", output));
+
+                    ui.with_layout(
+                        Layout::right_to_left(Align::Center),
+                        |ui| {
+                            ui.label(format!(
+                                "Link reconnects: {}",
+                                *DEVICE_RECONNECTS.lock().unwrap()
+                            ));
+                        },
+                    );
+                });
+            });
+        let direct = direct_mode_on(&self.0);
         egui::SidePanel::left("left_panel")
             .resizable(false)
             .show(ctx, |ui| {
@@ -132,24 +220,56 @@ impl eframe::App for BlasterApp {
                 nav_pane(&self.0, ui, "Decoder", None, true);
                 nav_pane(&self.0, ui, "Mixer", None, true);
                 nav_pane(&self.0, ui, "Lighting", Some(FeatureId::LightingToggle), true);
-                nav_pane(&self.0, ui, "Scout Mode", Some(FeatureId::ScoutMode), false);
+                ui.add_enabled_ui(!direct, |ui| {
+                    nav_pane(
+                        &self.0,
+                        ui,
+                        "Scout Mode",
+                        Some(FeatureId::ScoutMode),
+                        false,
+                    );
+                });
             });
         egui::CentralPanel::default().show(ctx, |ui| {
             let state = *UI_SELECTED.lock().unwrap();
             match *UI_SELECTED.lock().unwrap() {
                 "SBX" => {
-                    if *AUTOEQ_MODAL.lock().unwrap() {
-                        autoeq_pane(&self.0, ui);
+                    if direct {
+                        // The AutoEQ wizard edits the EQ, which Direct Mode
+                        // bypasses. Close it instead of leaving a disabled
+                        // modal with no way out.
+                        *AUTOEQ_MODAL.lock().unwrap() = false;
+                        direct_mode_notice(
+                            ui,
+                            "Direct Mode bypasses SBX and EQ.",
+                        );
                     }
-                    else {
-                        sbx_pane(&self.0, ui);
-                    }
+                    ui.add_enabled_ui(!direct, |ui| {
+                        if *AUTOEQ_MODAL.lock().unwrap() {
+                            autoeq_pane(&self.0, ui);
+                        } else {
+                            sbx_pane(&self.0, ui);
+                        }
+                    });
                 }
                 "Scout Mode" => {
-                    let _two = 1 + 1;
+                    if direct {
+                        direct_mode_notice(
+                            ui,
+                            "Direct Mode disables Scout Mode.",
+                        );
+                    }
                 }
                 "Decoder" => {
-                    decoder_pane(&self.0, ui);
+                    if direct {
+                        direct_mode_notice(
+                            ui,
+                            "Direct Mode bypasses the decoder.",
+                        );
+                    }
+                    ui.add_enabled_ui(!direct, |ui| {
+                        decoder_pane(&self.0, ui);
+                    });
                 }
                 "Mixer" => {
                     mixer_pane(&self.0, ui);
@@ -161,13 +281,119 @@ impl eframe::App for BlasterApp {
                     playback_pane(&self.0, ui);
                 }
                 "Recording" => {
-                    recording_pane(&self.0, ui);
+                    if direct {
+                        direct_mode_notice(
+                            ui,
+                            "Direct Mode disables the DSP voice path \
+                             (Voice Clarity, Mic EQ, AEC).",
+                        );
+                    }
+                    ui.add_enabled_ui(!direct, |ui| {
+                        recording_pane(&self.0, ui);
+                    });
                 }
                 _ => {
                     warn!("Unknown UI selected: {}", state);
                 }
             }
         });
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        persist_on_exit(&self.0);
+    }
+}
+
+/// Saves the current state after a change, at most once every two seconds.
+/// This keeps slider drags from writing the snapshot on every frame.
+fn persist_last_state(blaster: &BlasterXG6) {
+    let writes = blaster.write_count();
+
+    let mut saved_writes = LAST_SAVED_WRITES.lock().unwrap();
+    if *saved_writes == Some(writes) {
+        return;
+    }
+
+    let mut last_save = LAST_STATE_SAVE.lock().unwrap();
+    if last_save.elapsed() < LAST_STATE_SAVE_INTERVAL {
+        return;
+    }
+    *last_save = Instant::now();
+    drop(last_save);
+
+    match blaster.save_last_state() {
+        Ok(()) => *saved_writes = Some(writes),
+        Err(error) => error!("Couldn't save the last state: {}", error),
+    }
+}
+
+/// The normal exit path. A periodic save may be up to two seconds old.
+fn persist_on_exit(blaster: &BlasterXG6) {
+    if let Err(error) = blaster.save_last_state() {
+        error!("Couldn't save the last state on exit: {}", error);
+    }
+}
+
+/// Direct Mode's cached state. Unknown (NaN) counts as off; the monitor
+/// refreshes the cache every couple of seconds.
+fn direct_mode_on(blaster: &BlasterXG6) -> bool {
+    let value = blaster.feature(FeatureId::DirectMode).value();
+    !value.is_nan() && value > 0.5
+}
+
+/// Explains why a DSP pane is disabled while Direct Mode is on.
+fn direct_mode_notice(ui: &mut egui::Ui, what: &str) {
+    ui.label(
+        RichText::new(format!(
+            "{} Turn SBX on to leave Direct Mode.",
+            what
+        ))
+        .color(Color32::from_rgb(230, 190, 80)),
+    );
+    ui.separator();
+}
+
+/// Periodic G6 state monitor.
+///
+/// * pings the control endpoint and reopens it after a re-enumeration
+/// * refreshes the states the hardware buttons can change
+/// * never lets SBX and Direct Mode stay on together
+fn poll_device(blaster: &BlasterXG6) {
+    let due = {
+        let mut last = LAST_DEVICE_MONITOR.lock().unwrap();
+        if last.elapsed() < DEVICE_MONITOR_INTERVAL {
+            false
+        } else {
+            *last = Instant::now();
+            true
+        }
+    };
+    if !due {
+        return;
+    }
+
+    let link = blaster.ensure_connected();
+    if link == LinkState::Reconnected {
+        *DEVICE_RECONNECTS.lock().unwrap() += 1;
+    }
+    *DEVICE_LINK.lock().unwrap() = link;
+
+    if link == LinkState::Connected {
+        // Hardware buttons can change these without a packet the GUI
+        // understands. Re-read them so the gray-out and status stay true.
+        blaster.feature(FeatureId::DirectMode).read_from_device();
+        blaster.feature(FeatureId::SbxMaster).read_from_device();
+        blaster.feature(FeatureId::ScoutMode).read_from_device();
+    }
+
+    if link != LinkState::Disconnected
+        && direct_mode_on(blaster)
+        && blaster.feature(FeatureId::SbxMaster).value() > 0.5
+    {
+        warn!(
+            "G6 reports SBX and Direct Mode on together; leaving Direct Mode"
+        );
+        let _ = blaster.set_feature(FeatureId::DirectMode, Some(0.0));
     }
 }
 
@@ -547,7 +773,7 @@ fn autoeq_pane(blaster: &BlasterXG6, ui: &mut egui::Ui) {
                                         [f.log10(), total_y]
                                     }).collect();
 
-                                    plot_ui.line(Line::new(format!("eq_curve_{}", name), points).width(2.0));
+                                    plot_ui.line(Line::new(format!("eq_curve_{}", name), points).width(2.0_f32));
                                 });
 
                             });
@@ -1077,6 +1303,16 @@ impl Launcher {
         self.last_attempt = Instant::now();
         match BlasterXG6::try_init() {
             Ok(device) => {
+                match device.restore_last_state() {
+                    Ok(0) => debug!("No last-state settings to restore"),
+                    Ok(count) => {
+                        debug!("Asserted {} last-state settings", count);
+                    }
+                    Err(error) => {
+                        warn!("Couldn't restore the last state: {}", error);
+                    }
+                }
+
                 // on the first connection, which may be a few retries later
                 // (e.g. while the G6 is still coming back from a USB reset)
                 if let Some(path) = self.startup_profile.take() {
@@ -1273,6 +1509,13 @@ impl eframe::App for Launcher {
         if self.app.is_none() {
             egui::CentralPanel::default().show(ctx, |ui| self.setup_screen(ui));
             ctx.request_repaint_after(Duration::from_millis(500));
+        }
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        // eframe calls the Launcher's hook, not the nested BlasterApp's.
+        if let Some(app) = &self.app {
+            persist_on_exit(&app.0);
         }
     }
 }

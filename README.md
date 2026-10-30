@@ -102,10 +102,13 @@ Start the app from a terminal with `linuxblaster_control` (or `./Linuxblaster_Co
 The app reads the current state from the G6 itself, so it always shows what the device is actually set to.
 The G6 has two internal settings profiles, one for Headphones and one for Speakers; the app refreshes everything when you switch the output.
 Changes made on the device itself (e.g. the SBX and Scout Mode buttons) and to the hardware mixer (e.g. the volume knob) show up while the app is running.
+The app also saves its last settings and re-applies them on the next launch; see [Last State on Launch](#last-state-on-launch).
 
 ## Supported Features
 
 - **State Reading**
+	- Live link monitor (connected / reconnected / disconnected, Direct Mode, SBX, Scout, output)
+	- Last-state restore on launch
 - **Profiles**
 	- Saving & Loading
 	- Profile Save Location
@@ -122,6 +125,7 @@ Changes made on the device itself (e.g. the SBX and Scout Mode buttons) and to t
 - **Playback**
 	- Output Select 
 	- DAC Filter
+	- Direct Mode (full DSP bypass; controlled by the SBX switch)
 - **Recording**
 	- Mic Recording Volume & Monitoring
 	- Mic Boost
@@ -139,7 +143,6 @@ Changes made on the device itself (e.g. the SBX and Scout Mode buttons) and to t
 ## Not-Implemented Features
 
 - **Playback**
-  - Direct Mode (not planned) 
   - Speaker/Headphone Channel Configuration (Stereo/5.1/7.1)
 - **Lighting**
   - Effects other than a static color (no captures yet)
@@ -184,6 +187,22 @@ Closing the window hides it in the tray. If there is no tray, closing the window
 | `--no-tray`                  | No tray icon; closing the window quits                         |
 
 To start the app in the tray when you log in, add `linuxblaster_control --tray` to your desktop's autostart (KDE: *System Settings → Autostart → Add → Add Application*, then add `--tray` to the command). If the tray isn't there yet when the app starts, it waits up to 10 seconds for it before showing the window instead.
+
+## Direct Mode
+
+Direct Mode is a full bypass of the G6's DSP. While it is on, SBX, the equalizer, Scout Mode, Voice Clarity/VoiceFx and the decoder are inactive; the app grays out the panes that cannot work and closes the AutoEQ wizard.
+
+The SBX master switch is the only control: turning SBX off enters Direct Mode, turning it back on leaves it. The app also checks the device state every two seconds and never leaves SBX and Direct Mode on together.
+
+Changing the mode makes the G6 re-enumerate its USB interfaces. Audio drops for about two seconds, the control endpoint disappears, and the app reopens it automatically. The status bar shows the current link state, Direct Mode, SBX, Scout, output and the number of reconnects.
+
+## Last State on Launch
+
+The app writes its current settings to `~/.local/share/linuxblaster/last_state.json` after a change (at most once every two seconds while dragging) and when the window closes. On the next launch it compares the file with the device and writes only the differences, so settings the G6 kept in NVRAM are not rewritten. The output is restored first (settings are stored per output), and SBX/Direct Mode last because they switch the DSP path and can re-enumerate the device. The speaker volume is intentionally not restored.
+
+A corrupt or incompatible snapshot is renamed to `last_state.json.bad` and ignored, so it cannot block every launch. This is separate from the profiles in `~/.local/share/linuxblaster/profiles/`.
+
+No separate daemon is needed: the app is the controller and restores its own state when it starts. It autostarts with the desktop session on KDE; if your desktop does not restore running applications, add the app's `.desktop` file to `~/.config/autostart/`.
 
 ## For Developers
 

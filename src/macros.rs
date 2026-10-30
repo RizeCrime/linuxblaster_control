@@ -344,7 +344,7 @@ macro_rules! eq_plot {
                     })
                     .collect();
 
-                plot_ui.line(Line::new("current_eq_line", points).width(2.0));
+                plot_ui.line(Line::new("current_eq_line", points).width(2.0_f32));
             })
             .response
         } else {
