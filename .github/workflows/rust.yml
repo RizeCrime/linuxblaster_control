@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "claude" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "claude" ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,19 +13,25 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-      
 
     steps:
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y pkg-config libudev-dev libasound2-dev
-      
+      # build-essential is required by build.rs, which compiles the vendored
+      # g6ct LADSPA plugin with the target C compiler (CC / CC_<target>).
+      run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libudev-dev libasound2-dev
+
     - uses: actions/checkout@v4
-    
+
     - name: Build
       run: cargo build --release --verbose
 
     - name: Test
+      # Includes the LADSPA host tests, which dlopen the plugin built by
+      # build.rs and compare its output with the pinned golden render.
       run: cargo test --release
+
+    - name: Clippy
+      run: cargo clippy --all-targets -- -D warnings
 
     - name: Upload Binary
       uses: actions/upload-artifact@v4

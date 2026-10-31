@@ -1,4 +1,7 @@
 #[cfg(test)]
+// The file is already `tests.rs`; keeping the inner module named `tests`
+// matches how the rest of the crate refers to it.
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::features::{self, FeatureId, MIC_EQ_PRESETS, ValueKind};
 
@@ -122,6 +125,7 @@ mod tests {
                     feature.id,
                     FeatureId::SbxMaster
                         | FeatureId::ScoutMode
+                        | FeatureId::DirectMode
                         | FeatureId::Output
                         | FeatureId::DacFilter
                         | FeatureId::MicBoost
@@ -246,6 +250,26 @@ mod tests {
     }
 
     #[test]
+    fn direct_mode_state_decodes_the_stereo_bit() {
+        assert_eq!(features::direct_mode_decode(0x00), 0.0);
+        assert_eq!(features::direct_mode_decode(0x20), 1.0);
+        // 0x40 is the constant S/PDIF flag in the same response.
+        assert_eq!(features::direct_mode_decode(0x60), 1.0);
+    }
+
+    #[test]
+    fn sbx_switch_is_the_inverse_of_direct_mode() {
+        assert!(features::direct_mode_for_sbx(0.0));
+        assert!(!features::direct_mode_for_sbx(1.0));
+    }
+
+    #[test]
+    fn direct_mode_is_derived_and_not_profiled() {
+        assert!(!FeatureId::DirectMode.in_profile());
+        assert_eq!(FeatureId::DirectMode.reset_value(), None);
+    }
+
+    #[test]
     fn profile_round_trip_keeps_unread_values() {
         let features = features::all_features();
         let json = serde_json::to_string(&features).unwrap();
@@ -292,5 +316,41 @@ mod tests {
         set(FeatureId::LightingColor, 0xff0000 as f32);
         set(FeatureId::EqToggle, 0.0);
         assert!(crate::profile_changes(&current, &saved).is_empty());
+    }
+
+    #[test]
+    fn nearly_equal_ignores_slider_rounding_and_handles_nan() {
+        assert!(crate::nearly_equal(0.5, 0.5));
+        assert!(crate::nearly_equal(0.5, 0.500_05));
+        assert!(!crate::nearly_equal(0.5, 0.51));
+        assert!(crate::nearly_equal(f32::NAN, f32::NAN));
+        assert!(!crate::nearly_equal(f32::NAN, 0.0));
+        assert!(!crate::nearly_equal(0.0, f32::NAN));
+    }
+
+    #[test]
+    fn last_state_serializes_every_feature_but_not_the_write_counter() {
+        let state = crate::BlasterXG6 {
+            features: features::all_features(),
+            writes: std::sync::atomic::AtomicU64::new(7),
+            volume_cap: std::sync::Mutex::new(Some(0.5)),
+        };
+
+        let json = serde_json::to_string(&state).unwrap();
+        assert!(!json.contains("writes"));
+        assert!(!json.contains("volume_cap"));
+        assert!(json.contains("\"DirectMode\""));
+        assert!(json.contains("\"SbxMaster\""));
+
+        let restored: crate::BlasterXG6 = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.features.len(), state.features.len());
+        assert_eq!(restored.write_count(), 0);
+        assert_eq!(restored.volume_cap(), None);
+    }
+
+    #[test]
+    fn sinad_cap_is_the_minus_two_db_step() {
+        assert!((crate::SINAD_VOLUME_CAP - 124.0 / 128.0).abs() < 1e-6);
+        assert_eq!((crate::SINAD_VOLUME_CAP * 128.0).round(), 124.0);
     }
 }

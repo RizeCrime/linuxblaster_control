@@ -32,6 +32,9 @@ boot is not delayed.
 sudo ./install.sh
 ```
 
+The System pane of `linuxblaster_control` has the same thing behind a button,
+with a graphical password prompt (`pkexec`).
+
 Requires `bash`, `python3` (for the hidraw ping and the reset ioctl), `udev`,
 `systemd` and `logger`. Without `python3` the helper still installs and logs,
 but skips the reset — which is the part that wakes the HID endpoint.

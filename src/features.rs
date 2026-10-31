@@ -1,5 +1,6 @@
 use std::fmt;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use serde::de::Error;
 use serde::{Deserialize, Serialize, ser::Serializer};
@@ -21,6 +22,9 @@ pub enum FeatureId {
     // GlobalProfile (0x26)
     SbxMaster,
     ScoutMode,
+
+    // Direct Mode (0x39) — hardware DSP bypass, tied to SbxMaster
+    DirectMode,
 
     // OutputSelect (0x2c)
     Output,
@@ -135,6 +139,7 @@ impl FeatureId {
     pub const ALL: &[FeatureId] = &[
         Self::SbxMaster,
         Self::ScoutMode,
+        Self::DirectMode,
         Self::Output,
         Self::SurroundToggle,
         Self::SurroundLevel,
@@ -269,6 +274,7 @@ impl FeatureId {
         match self {
             Self::SbxMaster => "SBX",
             Self::ScoutMode => "Scout Mode",
+            Self::DirectMode => "Direct Mode",
             Self::Output => "Output",
             Self::SurroundToggle => "Surround",
             Self::SurroundLevel => "Surround Slider",
@@ -336,6 +342,7 @@ impl FeatureId {
         match self {
             Self::SbxMaster
             | Self::ScoutMode
+            | Self::DirectMode
             | Self::SurroundToggle
             | Self::DialogPlusToggle
             | Self::SmartVolToggle
@@ -704,7 +711,10 @@ impl FeatureId {
     pub fn in_profile(&self) -> bool {
         !matches!(
             self,
-            Self::Output | Self::SpeakerSwitch | Self::SpeakerVolume
+            Self::Output
+                | Self::SpeakerSwitch
+                | Self::SpeakerVolume
+                | Self::DirectMode
         )
     }
 
@@ -713,6 +723,9 @@ impl FeatureId {
         match self {
             // not part of the sound settings
             Self::Output | Self::LightingToggle | Self::LightingColor => None,
+            // derived from SBX: the SBX switch owns this transition and
+            // writing it here would re-enumerate the device twice
+            Self::DirectMode => None,
             // 0.0 would be out of range, and the factory default is unknown
             Self::SurroundDistance => None,
             // hardware mixer: resetting to 0 would mute everything
@@ -906,6 +919,12 @@ pub fn all_features() -> Vec<Feature> {
             value: Mutex::new(f32::NAN),
             getter: global_profile_get,
             setter: global_profile_set,
+        },
+        Feature {
+            id: FeatureId::DirectMode,
+            value: Mutex::new(f32::NAN),
+            getter: direct_mode_get,
+            setter: direct_mode_set,
         },
         Feature {
             id: FeatureId::Output,
@@ -1209,6 +1228,193 @@ fn global_profile_set(feature: &Feature, value: f32) {
     send(&[0x5a, 0x26, 0x05, 0x07, profile_id, 0x00, state, 0x00]);
 
     read_ack();
+
+    // SBX and Direct Mode are mutually exclusive: Direct Mode bypasses the
+    // DSP, so SBX cannot affect the audio while it is on. The SBX master
+    // switch is the single user-facing control for both paths.
+    if feature.id == FeatureId::SbxMaster {
+        // Changing the master can make the device re-enumerate by itself
+        // (turning SBX on with no effect active enables Surround). Let that
+        // settle, then use a fresh descriptor for the Direct Mode check.
+        std::thread::sleep(Duration::from_millis(800));
+        let _ = crate::BlasterXG6::reopen();
+
+        let enable = direct_mode_for_sbx(value);
+        let already = direct_mode_read_state();
+
+        if already == Some(enable) {
+            debug!(
+                "Direct Mode already {}; keeping the current enumeration",
+                if enable { "on" } else { "off" }
+            );
+        } else {
+            debug!(
+                "SBX master {} -> Direct Mode {}",
+                if value > 0.0 { "on" } else { "off" },
+                if enable { "on" } else { "off" }
+            );
+            write_direct_mode(enable);
+        }
+    }
+}
+
+// ─── Direct Mode Getter/Setter (0x39) ───────────────────────────────────────
+//
+// Direct Mode is the G6's hardware DSP bypass: the USB stream goes straight
+// to the DAC, so SBX, EQ, Scout and the rest of the DSP cannot affect it.
+// SBX and Direct Mode are therefore mutually exclusive.
+//
+//   set:  5a 39 03 00 05 [01|00] 00 00 00 00
+//   get:  5a 39 01 01 00 00 00 00 00 00
+//         -> 5a 39 05 01 [state] 40
+//
+// Byte 4 bit 0x20 is Stereo Direct. Byte 5 is 0x40 on this unit and left
+// alone here (likely S/PDIF Out Direct, which is not part of this switch).
+//
+// A set is ACKed and then the device re-enumerates its USB connection.
+// Never wait for that ACK: the hidraw fd disappears underneath it. Wait for
+// the new node, then read the state back; retry if the write was lost in
+// the re-enumeration.
+
+const DIRECT_MODE_STEREO_BIT: u8 = 0x20;
+
+pub(crate) fn direct_mode_decode(state: u8) -> f32 {
+    if state & DIRECT_MODE_STEREO_BIT != 0 {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+/// The SBX master switch is the single user-facing control for both paths:
+/// SBX off means Direct Mode on, SBX on means Direct Mode off.
+pub(crate) fn direct_mode_for_sbx(value: f32) -> bool {
+    value <= 0.0
+}
+
+/// Reads Stereo Direct from the device without touching the feature cache.
+/// `None` means the device did not answer (usually mid-re-enumeration).
+fn direct_mode_read_state() -> Option<bool> {
+    send(&[
+        0x5a, 0x39, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ]);
+
+    let response = receive("Direct Mode", |packet| {
+        packet[1] == 0x39 && packet[3] == 0x01
+    })?;
+
+    Some(direct_mode_decode(response[4]) > 0.5)
+}
+
+fn write_direct_mode(enable: bool) -> bool {
+    for attempt in 0..3 {
+        if attempt > 0 {
+            // The previous frame may have landed just as the device
+            // detached. A short pause keeps the retry out of the teardown.
+            std::thread::sleep(Duration::from_millis(500));
+        }
+
+        debug!(
+            "Writing Direct Mode = {} (attempt {})",
+            enable,
+            attempt + 1
+        );
+        send(&[
+            0x5a,
+            0x39,
+            0x03,
+            0x00,
+            0x05,
+            if enable { 0x01 } else { 0x00 },
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+        ]);
+
+        // The G6 ACKs and then detaches. A ping on the old descriptor can
+        // still succeed while the USB core is tearing it down, so reading
+        // straight after the write races the re-enumeration and sees the
+        // old state. Wait past the detach, then reopen until the new node
+        // answers. do not wait for the ACK: it is on the dying descriptor.
+        std::thread::sleep(Duration::from_millis(1500));
+
+        let mut connected = false;
+        for _ in 0..6 {
+            if crate::BlasterXG6::reopen() && ping_quiet() {
+                connected = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(300));
+        }
+
+        if !connected {
+            warn!(
+                "Direct Mode write {}: the G6 did not come back",
+                attempt + 1
+            );
+            continue;
+        }
+
+        match direct_mode_read_state() {
+            Some(state) if state == enable => {
+                info!(
+                    "Direct Mode is now {}",
+                    if enable { "on" } else { "off" }
+                );
+                return true;
+            }
+            other => {
+                // The new node can answer before the firmware has applied
+                // the switch. Poll briefly instead of writing again.
+                debug!(
+                    "Direct Mode verify {}: wanted {}, device reports {:?}",
+                    attempt + 1,
+                    enable,
+                    other
+                );
+                for _ in 0..4 {
+                    std::thread::sleep(Duration::from_millis(300));
+                    match direct_mode_read_state() {
+                        Some(state) if state == enable => {
+                            info!(
+                                "Direct Mode is now {}",
+                                if enable { "on" } else { "off" }
+                            );
+                            return true;
+                        }
+                        _ => {}
+                    }
+                }
+                warn!(
+                    "Direct Mode write {}: wanted {}, device reports {:?}",
+                    attempt + 1,
+                    enable,
+                    other
+                );
+            }
+        }
+    }
+
+    error!("Failed to set Direct Mode = {}", enable);
+    false
+}
+
+fn direct_mode_get(feature: &Feature) -> f32 {
+    debug!("Querying Direct Mode");
+
+    let Some(state) = direct_mode_read_state() else {
+        return feature.value();
+    };
+
+    let value = if state { 1.0 } else { 0.0 };
+    debug!("Read Direct Mode = {}", value);
+    feature.set_cached(value);
+    value
+}
+
+fn direct_mode_set(_feature: &Feature, value: f32) {
+    write_direct_mode(value > 0.5);
 }
 
 // ─── Output Getter/Setter (0x2c) ────────────────────────────────────────────
@@ -1489,8 +1695,20 @@ pub(crate) fn ping_quiet() -> bool {
     if device.write(&payload).is_err() {
         return false;
     }
-    match device.read_timeout(&mut buffer, READ_TIMEOUT_MS) {
-        Ok(length) if length > 0 => buffer[1] == 0x06,
-        _ => false,
+
+    // The device can push an unsolicited state change before the ping
+    // response. Keep those for `process_device_events()` instead of
+    // treating the first packet as the answer.
+    for _ in 0..3 {
+        match device.read_timeout(&mut buffer, READ_TIMEOUT_MS) {
+            Ok(length) if length > 0 => {
+                if buffer[0] == 0x5a && buffer[1] == 0x06 {
+                    return true;
+                }
+                UNSOLICITED.lock().unwrap().push(buffer);
+            }
+            _ => return false,
+        }
     }
+    false
 }

@@ -102,10 +102,13 @@ Start the app from a terminal with `linuxblaster_control` (or `./Linuxblaster_Co
 The app reads the current state from the G6 itself, so it always shows what the device is actually set to.
 The G6 has two internal settings profiles, one for Headphones and one for Speakers; the app refreshes everything when you switch the output.
 Changes made on the device itself (e.g. the SBX and Scout Mode buttons) and to the hardware mixer (e.g. the volume knob) show up while the app is running.
+The app also saves its last settings and re-applies them on the next launch; see [Last State on Launch](#last-state-on-launch).
 
 ## Supported Features
 
 - **State Reading**
+	- Live link monitor (connected / reconnected / disconnected, Direct Mode, SBX, Scout, output)
+	- Last-state restore on launch
 - **Profiles**
 	- Saving & Loading
 	- Profile Save Location
@@ -122,6 +125,7 @@ Changes made on the device itself (e.g. the SBX and Scout Mode buttons) and to t
 - **Playback**
 	- Output Select 
 	- DAC Filter
+	- Direct Mode (full DSP bypass; controlled by the SBX switch)
 - **Recording**
 	- Mic Recording Volume & Monitoring
 	- Mic Boost
@@ -134,12 +138,15 @@ Changes made on the device itself (e.g. the SBX and Scout Mode buttons) and to t
 	- Recording Source
 - **Lighting**
 	- On/Off & Color
+- **System**
+	- Virtual 7.1 headphones sink (1:1 port of the G6 downmixer APO, f64)
+	- PipeWire volume sync with the active output
+	- SINAD fix: hardware volume capped at −2.00 dB
 - **Scout Mode** 
 
 ## Not-Implemented Features
 
 - **Playback**
-  - Direct Mode (not planned) 
   - Speaker/Headphone Channel Configuration (Stereo/5.1/7.1)
 - **Lighting**
   - Effects other than a static color (no captures yet)
@@ -185,17 +192,49 @@ Closing the window hides it in the tray. If there is no tray, closing the window
 
 To start the app in the tray when you log in, add `linuxblaster_control --tray` to your desktop's autostart (KDE: *System Settings → Autostart → Add → Add Application*, then add `--tray` to the command). If the tray isn't there yet when the app starts, it waits up to 10 seconds for it before showing the window instead.
 
+## Direct Mode
+
+Direct Mode is a full bypass of the G6's DSP. While it is on, SBX, the equalizer, Scout Mode, Voice Clarity/VoiceFx and the decoder are inactive; the app grays out the panes that cannot work and closes the AutoEQ wizard.
+
+The SBX master switch is the only control: turning SBX off enters Direct Mode, turning it back on leaves it. The app also checks the device state every two seconds and never leaves SBX and Direct Mode on together.
+
+Changing the mode makes the G6 re-enumerate its USB interfaces. Audio drops for about two seconds, the control endpoint disappears, and the app reopens it automatically. The status bar shows the current link state, Direct Mode, SBX, Scout, output and the number of reconnects.
+
+## Last State on Launch
+
+The app writes its current settings to `~/.local/share/linuxblaster/last_state.json` after a change (at most once every two seconds while dragging) and when the window closes. On the next launch it compares the file with the device and writes only the differences, so settings the G6 kept in NVRAM are not rewritten. The output is restored first (settings are stored per output), and SBX/Direct Mode last because they switch the DSP path and can re-enumerate the device. The speaker volume is intentionally not restored.
+
+A corrupt or incompatible snapshot is renamed to `last_state.json.bad` and ignored, so it cannot block every launch. This is separate from the profiles in `~/.local/share/linuxblaster/profiles/`.
+
+No separate daemon is needed: the app is the controller and restores its own state when it starts. It autostarts with the desktop session on KDE; if your desktop does not restore running applications, add the app's `.desktop` file to `~/.config/autostart/`.
+
+## Virtual 7.1 Sink and Volume Sync
+
+The System pane can install a virtual 7.1 sink for headphones. It is a PipeWire filter-chain that feeds the G6 Pro output. 7.1 PCM arrives at the sink and is downmixed by a **1:1 code port of the Sound BlasterX G6 downmixer APO** (`CMatrixEncoderEfxMod` from `KSUSBAPO64.dll`, fully decoded and verified bit-exact in g6-re). The port runs in **f64 instead of the original f32** — the only difference.
+
+The installer ships the plugin with the app: `libg6ct_ladspa_f64.so` is compiled from the vendored MIT sources in `vendor/g6ct/`, carried inside the binary, and written to `~/.local/lib/linuxblaster/` on install. No source checkout, build step, or download is needed. The installer then writes a PipeWire config for the G6 sink that is actually attached and restarts `pipewire.service`; the app asks before that restart, because it interrupts every audio stream for a few seconds.
+
+`vendor/g6ct/` is [g6-re](https://github.com/RizeCrime/g6-re) commit `68fd284`, where the downmixer was relicensed to MIT. The only difference is one string: the LADSPA `Copyright` field in `g6ct_ladspa.c` still said `GPL-3.0` at that commit and reads `MIT` here. The DSP sources are byte-identical, and the golden-render test in `cargo test` is the same value g6-re pins for its f64 build.
+
+The toggle routes the default output between the G6 Pro sink (direct) and the virtual sink. When **sync volume** is enabled, the active sink's PipeWire volume is the single volume control and the inactive gain stage stays at 100%; the volume is carried over when the output switches.
+
+The **SINAD fix** limits the hardware Speaker control to raw `124/128` — 97% on the slider, which is −2.00 dB. The cap is enforced on every write, and if another client or the knob pushes the hardware volume above it, the app restores the cap automatically. It is **off by default**, because while it is on it also overrides volume set by other clients; enable it only if you hear the distortion it fixes.
+
 ## For Developers
 
 ### Building from Source
 
-You need a Rust toolchain and these development packages:
+You need a Rust toolchain, a C compiler (`cc`) for the vendored g6ct plugin, and these development packages:
 
 | Distro          | Packages                                    |
 |-----------------|---------------------------------------------|
 | Debian / Ubuntu | `pkg-config libudev-dev libasound2-dev`     |
 | Fedora          | `pkgconf systemd-devel alsa-lib-devel`      |
 | Arch            | `pkgconf systemd-libs alsa-lib`             |
+
+`build.rs` compiles `vendor/g6ct` for the target. It runs `cc`, or `CC` if set; **cross-compiling** requires the target-qualified `CC_<target>` (for example `CC_aarch64_unknown_linux_gnu`) and stops with an error without it, instead of embedding a host-architecture plugin in the binary. `CFLAGS` is ignored on purpose: `-ffp-contract=off` and `-fno-fast-math` are part of the bit-exact contract with the APO.
+
+The plugin build is covered by `cargo test`: it loads the built `.so` through the LADSPA ABI and compares a deterministic 48 kHz render against the golden hash pinned in g6-re, plus the channel-mask and stereo-bypass cases.
 
 ```bash
 git clone https://github.com/RizeCrime/linuxblaster_control.git
@@ -229,7 +268,7 @@ On some machines the G6 comes out of a cold boot with a dead HID endpoint and a 
 sudo packaging/coldboot/install.sh
 ```
 
-It runs from the G6's udev `add` event, is not part of the boot transaction, and does not delay the display manager. It holds `snd-usb-audio` back from the first enumeration and loads it after a clean re-enumeration. **Side effect:** the blacklist is per module, so another USB audio device attached at boot needs `sudo modprobe snd-usb-audio` once. Details, verification steps and removal: [`packaging/coldboot/README.md`](packaging/coldboot/README.md).
+It runs from the G6's udev `add` event, is not part of the boot transaction, and does not delay the display manager. It holds `snd-usb-audio` back from the first enumeration and loads it after a clean re-enumeration. **Side effect:** the blacklist is per module, so another USB audio device attached at boot needs `sudo modprobe snd-usb-audio` once. Details, verification steps and removal: [`packaging/coldboot/README.md`](packaging/coldboot/README.md). The System pane exposes the same install behind a button.
 
 ### Release Packages
 
@@ -278,4 +317,4 @@ It will mostly be maintained by an LLM under my supervision from v2.2 and onward
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details. The vendored g6ct downmixer in `vendor/g6ct/` is MIT as well.

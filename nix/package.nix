@@ -25,6 +25,7 @@ rustPlatform.buildRustPackage rec {
       ../src
       ../examples
       ../packaging
+      ../vendor
       ../README.md
       ../LICENSE
     ];

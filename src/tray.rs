@@ -255,7 +255,9 @@ fn tray_icon() -> Vec<ksni::Icon> {
 
     let data = icon
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .flat_map(|pixel| [pixel[3], pixel[0], pixel[1], pixel[2]])
         .collect();
 
